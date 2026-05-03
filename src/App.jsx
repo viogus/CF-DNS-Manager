@@ -1155,6 +1155,7 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
                 setRecords(prev => prev.map(r =>
                     r.id === record.id ? { ...r, proxied: originalStatus } : r
                 ));
+                const data = await res.json().catch(() => ({}));
                 const isFallbackError = data.errors?.some(e => e.code === 1040);
                 if (isFallbackError) {
                     showToast(t('fallbackError'), 'error');
@@ -2503,7 +2504,7 @@ const DnspodManager = ({ auth, onBack, t, showToast }) => {
                 {loading && records.length === 0 ? (
                     <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
                         <RefreshCw className="spin" size={32} />
-                        <p style={{ marginTop: '1rem' }}>{t('loading')}</p>
+                        <p style={{ marginTop: '1rem' }}>{t('statusInitializing')}</p>
                     </div>
                 ) : filteredRecords.length === 0 ? (
                     <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
@@ -2673,7 +2674,7 @@ const DnspodManager = ({ auth, onBack, t, showToast }) => {
                             <p style={{ marginBottom: '1.5rem', color: 'var(--text-muted)' }}>{confirmModal.message}</p>
                             <div style={{ display: 'flex', gap: '0.75rem' }}>
                                 <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => setConfirmModal({ show: false })}>{t('cancel')}</button>
-                                <button className="btn btn-primary" style={{ flex: 1, background: 'var(--error)' }} onClick={() => { confirmModal.onConfirm?.(); setConfirmModal({ show: false }); }}>{t('confirm')}</button>
+                                <button className="btn btn-primary" style={{ flex: 1, background: 'var(--error)' }} onClick={() => { confirmModal.onConfirm?.(); setConfirmModal({ show: false }); }}>{t('yes')}</button>
                             </div>
                         </div>
                     </div>
