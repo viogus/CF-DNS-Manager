@@ -47,7 +47,7 @@ export async function authenticate(request, env, url) {
       if (accountIndex > 0) {
         serverToken = env[`CF_API_TOKEN${accountIndex}`];
       } else {
-        serverToken = env.DNS_TOKEN || env.CF_API_TOKEN;
+        serverToken = env.CF_API_DNS_TOKEN || env.CF_API_TOKEN;
       }
 
       if (!serverToken) {
