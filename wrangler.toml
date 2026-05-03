@@ -1,15 +1,13 @@
 name = "cf-dns-manager"
+main = "worker/index.js"
 compatibility_date = "2026-05-03"
-pages_build_output_dir = "dist"
 
-# KV namespace binding is configured in Cloudflare Dashboard:
-#   Pages project → Settings → Functions → KV namespace bindings → DNS_ROTATIONS
-#
-# For local dev with wrangler pages dev, use:
-#   npx wrangler pages dev dist --kv DNS_ROTATIONS
-#
-# Once KV namespace is created, uncomment and fill in IDs:
-# [[kv_namespaces]]
-# binding = "DNS_ROTATIONS"
-# id = "<real-namespace-id>"
-# preview_id = "<preview-namespace-id>"
+[assets]
+directory = "dist"
+
+[[kv_namespaces]]
+binding = "DNS_ROTATIONS"
+id = "DNS_ROTATIONS"
+
+[triggers]
+crons = ["* * * * *"]
