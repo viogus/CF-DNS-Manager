@@ -53,6 +53,17 @@ export async function onRequestPost(context) {
     });
   }
 
+  if (body.ipSource === 'manual' && body.manualIPs) {
+    const validIP = (ip) => /^[0-9.]+$/.test(ip) && ip.includes('.') || /:/.test(ip);
+    const invalid = body.manualIPs.find(ip => !validIP(ip));
+    if (invalid) {
+      return new Response(JSON.stringify({ success: false, error: `Invalid IP address: ${invalid}` }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+  }
+
   const interval = parseInt(body.interval) || 86400;
   if (interval < 300) {
     return new Response(JSON.stringify({ success: false, error: 'interval must be >= 300 seconds' }), {

@@ -916,7 +916,7 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
     const [rotationLoading, setRotationLoading] = useState(false);
     const [showRotationModal, setShowRotationModal] = useState(false);
     const [editingRotation, setEditingRotation] = useState(null);
-    const [newRotation, setNewRotation] = useState({
+    const defaultRotation = {
         recordId: '',
         recordName: '',
         recordType: 'A',
@@ -926,7 +926,8 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
         interval: 86400,
         intervalPreset: '86400',
         enabled: true
-    });
+    };
+    const [newRotation, setNewRotation] = useState(defaultRotation);
 
     const fetchRotations = async () => {
         setRotationLoading(true);
@@ -1704,6 +1705,7 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
                                     </button>
                                     <button className="btn btn-primary" onClick={() => {
                                         setEditingRotation(null);
+                                        setNewRotation(defaultRotation);
                                         setShowRotationModal(true);
                                     }}>
                                         <Plus size={16} /> <span className="btn-text">{t('createRotation')}</span>

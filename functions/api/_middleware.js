@@ -18,8 +18,14 @@ export async function onRequest(context) {
         return next();
     }
 
-    // Priority 2: Rotation Key (cron Worker trigger)
+    // Priority 2: Rotation Key (cron Worker trigger, scoped to /api/rotations/)
     if (rotationKey && env.ROTATION_API_KEY && rotationKey === env.ROTATION_API_KEY) {
+        if (!url.pathname.startsWith('/api/rotations/')) {
+            return new Response(JSON.stringify({ error: 'Rotation key not allowed for this endpoint' }), {
+                status: 403,
+                headers: { 'Content-Type': 'application/json' }
+            });
+        }
         context.data.cfToken = env.CF_API_TOKEN;
         context.data.komariBaseUrl = env.KOMARI_BASE_URL;
         context.data.komariApiToken = env.KOMARI_API_TOKEN;
