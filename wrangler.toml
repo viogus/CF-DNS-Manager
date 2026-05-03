@@ -5,9 +5,9 @@ compatibility_date = "2026-05-03"
 [assets]
 directory = "dist"
 
-[[kv_namespaces]]
-binding = "DNS_ROTATIONS"
-id = "PLACEHOLDER_KV_ID"
+# [[kv_namespaces]]
+# binding = "DNS_ROTATIONS"
+# id = "PLACEHOLDER_KV_ID"
 
 [triggers]
 crons = ["* * * * *"]

@@ -68,9 +68,17 @@ async function findOrCreateKV() {
 
 function updateWranglerToml(kvId) {
   let content = readFileSync(WRANGLER_PATH, 'utf8');
-  // Only replace the id field under [[kv_namespaces]], not comments or other occurrences
-  content = content.replace(/^id\s*=\s*"PLACEHOLDER_KV_ID"/m, `id = "${kvId}"`);
-  // Only write if running in CI (don't dirty local working tree)
+
+  // Check if KV section is commented out
+  if (content.includes('# [[kv_namespaces]]')) {
+    content = content.replace(
+      '# [[kv_namespaces]]\n# binding = "DNS_ROTATIONS"\n# id = "PLACEHOLDER_KV_ID"',
+      `[[kv_namespaces]]\nbinding = "DNS_ROTATIONS"\nid = "${kvId}"`
+    );
+  } else {
+    content = content.replace(/^id\s*=\s*"PLACEHOLDER_KV_ID"/m, `id = "${kvId}"`);
+  }
+
   if (process.env.CI) {
     writeFileSync(WRANGLER_PATH, content);
   }
