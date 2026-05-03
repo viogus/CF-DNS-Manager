@@ -8,8 +8,9 @@ const KV_NAME = 'DNS_ROTATIONS';
 const WRANGLER_PATH = join(process.cwd(), 'wrangler.toml');
 
 if (!TOKEN || !ACCOUNT_ID) {
-  console.error('CF_API_TOKEN and CF_ACCOUNT_ID env vars required');
-  process.exit(1);
+  console.log('Skipping KV setup: CF_API_TOKEN and CF_ACCOUNT_ID not set.');
+  console.log('Set GitHub Secrets to enable auto-deploy. See README for instructions.');
+  process.exit(0);
 }
 
 const apiHeaders = {
