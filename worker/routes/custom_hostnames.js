@@ -1,0 +1,62 @@
+export async function GET(request, env, params, data) {
+  const { cfToken } = data;
+  const { zoneId } = params;
+  const response = await fetch(`https://api.cloudflare.com/client/v4/zones/${zoneId}/custom_hostnames?per_page=100`, {
+    headers: { 'Authorization': `Bearer ${cfToken}`, 'Content-Type': 'application/json' }
+  });
+  const responseData = await response.json();
+  return new Response(JSON.stringify(responseData), {
+    status: response.status,
+    headers: { 'Content-Type': 'application/json' }
+  });
+}
+
+export async function POST(request, env, params, data) {
+  const { cfToken } = data;
+  const { zoneId } = params;
+  const body = await request.json();
+  const response = await fetch(`https://api.cloudflare.com/client/v4/zones/${zoneId}/custom_hostnames`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${cfToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  const responseData = await response.json();
+  return new Response(JSON.stringify(responseData), {
+    status: response.status,
+    headers: { 'Content-Type': 'application/json' }
+  });
+}
+
+export async function DELETE(request, env, params, data) {
+  const { cfToken } = data;
+  const { zoneId } = params;
+  const hostnameId = new URL(request.url).searchParams.get('id');
+  if (!hostnameId) return new Response('Missing ID', { status: 400 });
+  const response = await fetch(`https://api.cloudflare.com/client/v4/zones/${zoneId}/custom_hostnames/${hostnameId}`, {
+    method: 'DELETE',
+    headers: { 'Authorization': `Bearer ${cfToken}`, 'Content-Type': 'application/json' }
+  });
+  const responseData = await response.json();
+  return new Response(JSON.stringify(responseData), {
+    status: response.status,
+    headers: { 'Content-Type': 'application/json' }
+  });
+}
+
+export async function PATCH(request, env, params, data) {
+  const { cfToken } = data;
+  const { zoneId } = params;
+  const hostnameId = new URL(request.url).searchParams.get('id');
+  const body = await request.json();
+  if (!hostnameId) return new Response('Missing ID', { status: 400 });
+  const response = await fetch(`https://api.cloudflare.com/client/v4/zones/${zoneId}/custom_hostnames/${hostnameId}`, {
+    method: 'PATCH',
+    headers: { 'Authorization': `Bearer ${cfToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  const responseData = await response.json();
+  return new Response(JSON.stringify(responseData), {
+    status: response.status,
+    headers: { 'Content-Type': 'application/json' }
+  });
+}
