@@ -13,6 +13,11 @@
   - 智能去重：自动检测并跳过已存在的相同记录
 - **多账户支持**：通过环境变量配置多个 Cloudflare API Token
 - **双模式运行**：支持本地模式（直接使用 API Token）和托管模式（服务端中转）
+- **DNS IP 轮换**（托管模式）：
+  - 定时自动更换 DNS 记录的 IP 地址（A/AAAA）
+  - 支持 Komari 服务器 IP 池或手动指定 IP 列表
+  - Round-Robin 顺序轮换，可自定义间隔（最短 5 分钟）
+  - 通过 Cloudflare Workers Cron Triggers + KV 实现
 
 
 ## 📋 详细部署指南
@@ -56,6 +61,65 @@
 
 配置后，在 DNS 记录添加/编辑 A 或 AAAA 记录时，可通过下拉框快速选择 Komari 服务器 IP；DNS 列表中已解析的 IP 也会显示对应的 Komari 服务器名称标签。
 
+
+#### DNS IP 轮换（可选，托管模式）
+
+如需使用 DNS 记录定时 IP 轮换功能，需要额外配置 KV 存储和 Cron Worker：
+
+##### 1. 创建 KV 命名空间
+
+```bash
+npx wrangler kv:namespace create DNS_ROTATIONS
+npx wrangler kv:namespace create DNS_ROTATIONS --preview
+```
+
+将输出的 `id` 和 `preview_id` 填入 `wrangler.toml` 的 `[[kv_namespaces]]` 中。
+
+##### 2. 绑定 KV 到 Pages
+
+在 Cloudflare Pages 控制面板：设置 → Functions → KV 命名空间绑定 → 添加 `DNS_ROTATIONS` 绑定。
+
+##### 3. 添加环境变量
+
+| 变量 | 说明 |
+|------|------|
+| `ROTATION_API_KEY` | 轮换执行 API 的认证密钥（自行生成复杂随机字符串） |
+
+> **注意**：如果使用 Komari 作为 IP 来源，还需要已配置 `KOMARI_BASE_URL` 和 `KOMARI_API_TOKEN`。
+
+##### 4. 部署 Cron Worker
+
+```bash
+npx wrangler deploy workers/rotate-trigger.js --name cf-dns-rotator --cron "*/5 * * * *"
+```
+
+部署后，在 Cloudflare Dashboard 为 Worker 设置环境变量：
+- `ROTATION_URL`：Pages 部署地址，如 `https://cf-dns-manager.pages.dev`
+- `ROTATION_API_KEY`：与 Pages 中 `ROTATION_API_KEY` 相同的密钥
+
+##### 5. 本地开发
+
+在 `.dev.vars` 中添加：
+```
+ROTATION_API_KEY=dev-secret-key
+DNS_ROTATIONS=<preview 命名空间 ID>
+```
+
+测试轮换执行：
+```bash
+curl -X POST http://localhost:8788/api/rotations/run \
+  -H "X-Rotation-Key: dev-secret-key"
+```
+
+##### 注意事项
+
+- 轮换间隔最短为 **300 秒**（5 分钟），建议生产环境设置为 3600 秒以上。
+- Cron Worker 每 5 分钟触发一次，但实际是否轮换由每条规则的 `lastRotatedAt + interval` 决定，不会频繁执行。
+- 轮换仅支持 **A** 和 **AAAA** 记录，MX/TXT/CNAME 等类型不支持。
+- KV 存储的旋转配置通过 meta index 管理，删除所有规则后 meta index 会自动清理。
+- 多账户场景下，轮换使用 `CF_API_TOKEN`（account index 0），如需指定账户请修改 KV 中的配置。
+
+---
 
 ## 🏗️ 项目架构
 

@@ -176,6 +176,33 @@ const translations = {
         confirmDeleteRecord: '确定要删除此记录吗？',
         komariServer: '选择IP',
         komariSelectPlaceholder: '选择 Komari 服务器 IP...',
+        // IP Rotation
+        ipRotation: 'IP 轮换',
+        rotationRules: '轮换规则',
+        createRotation: '创建轮换',
+        editRotation: '编辑轮换',
+        rotationInterval: '轮换间隔',
+        lastRotated: '上次轮换',
+        never: '从未',
+        sourceType: 'IP 来源',
+        rotationSourceKomari: 'Komari 服务器',
+        rotationSourceManual: '手动输入',
+        selectRecord: '选择 DNS 记录',
+        noRotations: '暂无轮换规则',
+        rotationCreated: '轮换规则已创建',
+        rotationUpdated: '轮换规则已更新',
+        rotationDeleted: '轮换规则已删除',
+        rotationToggledOn: '轮换已开启',
+        rotationToggledOff: '轮换已关闭',
+        confirmDeleteRotation: '确定要删除此轮换规则吗？',
+        oneHour: '1 小时',
+        sixHours: '6 小时',
+        twelveHours: '12 小时',
+        oneDay: '1 天',
+        oneWeek: '1 周',
+        customSeconds: '自定义（秒）',
+        rotationEnabled: '已启用',
+        rotationDisabled: '已停用',
     },
     en: {
         title: 'DNS Manager',
@@ -350,6 +377,33 @@ const translations = {
         confirmDeleteRecord: 'Are you sure you want to delete this record?',
         komariServer: 'Select IP',
         komariSelectPlaceholder: 'Select Komari server IP...',
+        // IP Rotation
+        ipRotation: 'IP Rotation',
+        rotationRules: 'Rotation Rules',
+        createRotation: 'Create Rotation',
+        editRotation: 'Edit Rotation',
+        rotationInterval: 'Rotation Interval',
+        lastRotated: 'Last Rotated',
+        never: 'Never',
+        sourceType: 'IP Source',
+        rotationSourceKomari: 'Komari Servers',
+        rotationSourceManual: 'Manual Input',
+        selectRecord: 'Select DNS Record',
+        noRotations: 'No rotation rules',
+        rotationCreated: 'Rotation rule created',
+        rotationUpdated: 'Rotation rule updated',
+        rotationDeleted: 'Rotation rule deleted',
+        rotationToggledOn: 'Rotation enabled',
+        rotationToggledOff: 'Rotation disabled',
+        confirmDeleteRotation: 'Are you sure you want to delete this rotation rule?',
+        oneHour: '1 Hour',
+        sixHours: '6 Hours',
+        twelveHours: '12 Hours',
+        oneDay: '1 Day',
+        oneWeek: '1 Week',
+        customSeconds: 'Custom (seconds)',
+        rotationEnabled: 'Enabled',
+        rotationDisabled: 'Disabled',
     }
 };
 
@@ -745,7 +799,7 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
     const [error, setError] = useState(null);
 
     // Komari 集成
-    const { komariEnabled, ipToNameMap, getOptions: getKomariOptions } = useKomari(auth);
+    const { komariEnabled, ipToNameMap, getOptions: getKomariOptions, servers } = useKomari(auth);
     const [expandedRecords, setExpandedRecords] = useState(new Set());
     const [showVerifyModal, setShowVerifyModal] = useState(false);
     const [verifyingSaaS, setVerifyingSaaS] = useState(null);
@@ -857,6 +911,137 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
         setAutoVerifyLoading(false);
     };
 
+    // Rotation state
+    const [rotations, setRotations] = useState([]);
+    const [rotationLoading, setRotationLoading] = useState(false);
+    const [showRotationModal, setShowRotationModal] = useState(false);
+    const [editingRotation, setEditingRotation] = useState(null);
+    const [newRotation, setNewRotation] = useState({
+        recordId: '',
+        recordName: '',
+        recordType: 'A',
+        ipSource: 'komari',
+        manualIPs: [],
+        komariServerFilter: [],
+        interval: 86400,
+        intervalPreset: '86400',
+        enabled: true
+    });
+
+    const fetchRotations = async () => {
+        setRotationLoading(true);
+        try {
+            const res = await fetch(`/api/zones/${zone.id}/rotations`, { headers: getHeaders() });
+            const data = await res.json();
+            setRotations(data.result || []);
+        } catch (e) {
+            showToast(t('errorOccurred'), 'error');
+        }
+        setRotationLoading(false);
+    };
+
+    const formatInterval = (seconds) => {
+        if (seconds >= 86400 && seconds % 86400 === 0) return `${seconds / 86400}d`;
+        if (seconds >= 3600 && seconds % 3600 === 0) return `${seconds / 3600}h`;
+        if (seconds >= 60 && seconds % 60 === 0) return `${seconds / 60}m`;
+        return `${seconds}s`;
+    };
+
+    const toggleRotation = async (rot) => {
+        const newEnabled = !rot.enabled;
+        try {
+            const res = await fetch(`/api/zones/${zone.id}/rotations?id=${rot.recordId}`, {
+                method: 'PATCH',
+                headers: getHeaders(true),
+                body: JSON.stringify({ enabled: newEnabled })
+            });
+            const data = await res.json();
+            if (data.success) {
+                setRotations(prev => prev.map(r => r.recordId === rot.recordId ? { ...r, enabled: newEnabled } : r));
+                showToast(newEnabled ? t('rotationToggledOn') : t('rotationToggledOff'));
+            } else {
+                showToast(data.error || t('errorOccurred'), 'error');
+            }
+        } catch (e) {
+            showToast(t('errorOccurred'), 'error');
+        }
+    };
+
+    const deleteRotationConfirm = (recordId) => {
+        openConfirm(t('confirmTitle'), t('confirmDeleteRotation'), async () => {
+            try {
+                const res = await fetch(`/api/zones/${zone.id}/rotations?id=${recordId}`, {
+                    method: 'DELETE',
+                    headers: getHeaders()
+                });
+                const data = await res.json();
+                if (data.success) {
+                    setRotations(prev => prev.filter(r => r.recordId !== recordId));
+                    showToast(t('rotationDeleted'));
+                } else {
+                    showToast(data.error || t('errorOccurred'), 'error');
+                }
+            } catch (e) {
+                showToast(t('errorOccurred'), 'error');
+            }
+        });
+    };
+
+    const editRotationStart = (rot) => {
+        setEditingRotation(rot);
+        let preset = 'custom';
+        if ([3600, 21600, 43200, 86400, 604800].includes(rot.interval)) preset = String(rot.interval);
+        setNewRotation({
+            recordId: rot.recordId,
+            recordName: rot.recordName,
+            recordType: rot.recordType,
+            ipSource: rot.ipSource,
+            manualIPs: [...(rot.manualIPs || [])],
+            komariServerFilter: [...(rot.komariServerFilter || [])],
+            interval: rot.interval,
+            intervalPreset: preset,
+            enabled: rot.enabled
+        });
+        setShowRotationModal(true);
+    };
+
+    const handleRotationSubmit = async (e) => {
+        e.preventDefault();
+        if (!newRotation.recordId) {
+            showToast(t('errorOccurred'), 'error');
+            return;
+        }
+        try {
+            const body = {
+                recordId: newRotation.recordId,
+                recordName: newRotation.recordName,
+                recordType: newRotation.recordType,
+                ipSource: newRotation.ipSource,
+                manualIPs: newRotation.ipSource === 'manual' ? newRotation.manualIPs : [],
+                komariServerFilter: newRotation.ipSource === 'komari' ? newRotation.komariServerFilter : [],
+                interval: newRotation.interval,
+                enabled: newRotation.enabled,
+                zoneName: zone.name
+            };
+            const res = await fetch(`/api/zones/${zone.id}/rotations`, {
+                method: 'POST',
+                headers: getHeaders(true),
+                body: JSON.stringify(body)
+            });
+            const data = await res.json();
+            if (data.success) {
+                setShowRotationModal(false);
+                setEditingRotation(null);
+                fetchRotations();
+                showToast(editingRotation ? t('rotationUpdated') : t('rotationCreated'));
+            } else {
+                showToast(data.error || t('errorOccurred'), 'error');
+            }
+        } catch (e) {
+            showToast(t('errorOccurred'), 'error');
+        }
+    };
+
     const getHeaders = (withType = false) => getAuthHeaders(auth, withType);
 
     const fetchDNS = async () => {
@@ -965,6 +1150,9 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
         if (tab === 'saas') {
             fetchHostnames();
             fetchFallback();
+        }
+        if (tab === 'rotation') {
+            fetchRotations();
         }
     }, [tab, zone.id]);
 
@@ -1398,12 +1586,27 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
                 >
                     {t('saasHostnames')}
                 </button>
+                <button
+                    className="btn"
+                    style={{
+                        background: 'transparent',
+                        color: tab === 'rotation' ? 'var(--primary)' : 'var(--text-muted)',
+                        borderBottom: tab === 'rotation' ? '2px solid var(--primary)' : 'none',
+                        borderRadius: 0,
+                        padding: '0.75rem 0',
+                        fontWeight: tab === 'rotation' ? '700' : '500'
+                    }}
+                    onClick={() => setTab('rotation')}
+                >
+                    <RefreshCw size={16} style={{ marginRight: '6px', verticalAlign: 'middle' }} />
+                    {t('ipRotation')}
+                </button>
             </div>
 
             <div className="glass-card" style={{ padding: '1.25rem', overflow: 'hidden' }}>
                 <div className="flex-stack header-stack" style={{ marginBottom: '1.0rem', flexWrap: 'wrap', gap: '1rem' }}>
                     <div className="header-top-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                        <h2 style={{ margin: 0, whiteSpace: 'nowrap' }}>{tab === 'dns' ? t('dnsRecords') : t('saasHostnames')}</h2>
+                        <h2 style={{ margin: 0, whiteSpace: 'nowrap' }}>{tab === 'dns' ? t('dnsRecords') : tab === 'saas' ? t('saasHostnames') : t('rotationRules')}</h2>
                         <div className="header-actions" style={{ display: 'flex', gap: '0.5rem' }}>
                             {tab === 'dns' && (
                                 <>
@@ -1432,7 +1635,7 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
                             )}
                             <button
                                 className="btn btn-outline"
-                                onClick={() => tab === 'dns' ? fetchDNS() : fetchHostnames()}
+                                onClick={() => tab === 'dns' ? fetchDNS() : tab === 'saas' ? fetchHostnames() : fetchRotations()}
                                 disabled={loading}
                             >
                                 <RefreshCw size={16} className={loading ? 'spin' : ''} />
@@ -1442,13 +1645,20 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
                                 <button className="btn btn-primary" onClick={() => { setEditingRecord(null); setShowDNSModal(true); setNewRecord({ type: 'A', name: '', content: '', ttl: 1, proxied: true, comment: '', priority: 10, data: {} }); }}>
                                     <Plus size={16} /> <span className="btn-text">{t('addRecord')}</span>
                                 </button>
-                            ) : (
+                            ) : tab === 'saas' ? (
                                 <button className="btn btn-primary" onClick={() => {
                                     setEditingSaaS(null);
                                     setNewSaaS(initialSaaS);
                                     setShowSaaSModal(true);
                                 }}>
                                     <Plus size={16} /> <span className="btn-text">{t('addSaaS')}</span>
+                                </button>
+                            ) : (
+                                <button className="btn btn-primary" onClick={() => {
+                                    setEditingRotation(null);
+                                    setShowRotationModal(true);
+                                }}>
+                                    <Plus size={16} /> <span className="btn-text">{t('createRotation')}</span>
                                 </button>
                             )}
                         </div>
@@ -1608,7 +1818,7 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
                                 ))}
                             </div>
                         </>
-                    ) : (
+                    ) : tab === 'saas' ? (
                         <>
                             {error && (
                                 <div className="glass-card" style={{ padding: '1rem', marginBottom: '1rem', background: '#fff5f5', border: '1px solid #feb2b2' }}>
@@ -1748,9 +1958,247 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
                                 ))}
                             </div>
                         </>
+                    ) : (
+                        <>
+                            {rotationLoading && rotations.length === 0 ? (
+                                <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
+                                    <RefreshCw className="spin" size={32} />
+                                    <p style={{ marginTop: '1rem' }}>{t('statusInitializing')}</p>
+                                </div>
+                            ) : rotations.length === 0 ? (
+                                <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
+                                    <p>{t('noRotations')}</p>
+                                </div>
+                            ) : (
+                                <>
+                                    <div className="table-container">
+                                        <table className="data-table desktop-only">
+                                            <thead>
+                                                <tr>
+                                                    <th>{t('name')}</th>
+                                                    <th>{t('type')}</th>
+                                                    <th>{t('sourceType')}</th>
+                                                    <th>{t('rotationInterval')}</th>
+                                                    <th>{t('lastRotated')}</th>
+                                                    <th>{t('status')}</th>
+                                                    <th>{t('actions')}</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {rotations.map(rot => (
+                                                    <tr key={rot.recordId}>
+                                                        <td style={{ fontWeight: 600 }}>{rot.recordName}</td>
+                                                        <td><span className="badge badge-blue">{rot.recordType}</span></td>
+                                                        <td style={{ fontSize: '0.8125rem' }}>
+                                                            {rot.ipSource === 'komari' ? t('rotationSourceKomari') : t('rotationSourceManual')}
+                                                        </td>
+                                                        <td style={{ fontSize: '0.8125rem' }}>{formatInterval(rot.interval)}</td>
+                                                        <td style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
+                                                            {rot.lastRotatedAt ? new Date(rot.lastRotatedAt).toLocaleString() : t('never')}
+                                                        </td>
+                                                        <td>
+                                                            <label className="toggle-switch">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={rot.enabled}
+                                                                    onChange={() => toggleRotation(rot)}
+                                                                />
+                                                                <span className="slider"></span>
+                                                            </label>
+                                                        </td>
+                                                        <td>
+                                                            <div style={{ display: 'flex', gap: '4px' }}>
+                                                                <button className="btn btn-outline" style={{ padding: '0.4rem', border: 'none' }} onClick={() => editRotationStart(rot)}>
+                                                                    <Edit2 size={16} color="var(--primary)" />
+                                                                </button>
+                                                                <button className="btn btn-outline" style={{ padding: '0.4rem', border: 'none' }} onClick={() => deleteRotationConfirm(rot.recordId)}>
+                                                                    <Trash2 size={16} color="var(--error)" />
+                                                                </button>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <div className="mobile-only">
+                                        {rotations.map(rot => (
+                                            <div key={rot.recordId} className="record-card" style={{ padding: '0.875rem', marginBottom: '8px' }}>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                                                    <div>
+                                                        <span className="badge badge-blue" style={{ marginRight: '8px' }}>{rot.recordType}</span>
+                                                        <span style={{ fontWeight: 600 }}>{rot.recordName}</span>
+                                                    </div>
+                                                    <label className="toggle-switch" style={{ transform: 'scale(0.8)', margin: 0 }}>
+                                                        <input type="checkbox" checked={rot.enabled} onChange={() => toggleRotation(rot)} />
+                                                        <span className="slider"></span>
+                                                    </label>
+                                                </div>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                                        <div>{rot.ipSource === 'komari' ? t('rotationSourceKomari') : t('rotationSourceManual')}</div>
+                                                        <div>{formatInterval(rot.interval)} {rot.lastRotatedAt ? '· ' + new Date(rot.lastRotatedAt).toLocaleDateString() : ''}</div>
+                                                    </div>
+                                                    <div style={{ display: 'flex', gap: '4px' }}>
+                                                        <button className="btn btn-outline" style={{ padding: '0.35rem', border: 'none' }} onClick={() => editRotationStart(rot)}>
+                                                            <Edit2 size={15} color="var(--primary)" />
+                                                        </button>
+                                                        <button className="btn btn-outline" style={{ padding: '0.35rem', border: 'none' }} onClick={() => deleteRotationConfirm(rot.recordId)}>
+                                                            <Trash2 size={15} color="var(--error)" />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </>
+                            )}
+                        </>
                     )}
                 </div>
             </div>
+
+            {/* Rotation Modal */}
+            {showRotationModal && (
+                <div
+                    style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }}
+                    onClick={(e) => { if (e.target === e.currentTarget) { setShowRotationModal(false); setEditingRotation(null); } }}
+                >
+                    <div className="glass-card fade-in" style={{ padding: '2rem', maxWidth: '500px', width: '90%', position: 'relative', maxHeight: '90vh', overflowY: 'auto' }}>
+                        <h2 style={{ marginBottom: '1.5rem' }}>{editingRotation ? t('editRotation') : t('createRotation')}</h2>
+                        <form onSubmit={handleRotationSubmit}>
+                            <div className="input-row">
+                                <label>{t('selectRecord')}</label>
+                                <div style={{ flex: 1 }}>
+                                    <CustomSelect
+                                        value={editingRotation ? newRotation.recordId : (newRotation.recordId || '')}
+                                        onChange={(e) => {
+                                            const record = records.find(r => String(r.id) === String(e.target.value));
+                                            if (record) {
+                                                setNewRotation({
+                                                    ...newRotation,
+                                                    recordId: record.id,
+                                                    recordName: record.name,
+                                                    recordType: record.type
+                                                });
+                                            }
+                                        }}
+                                        options={records.filter(r => ['A', 'AAAA'].includes(r.type)).map(r => ({ value: r.id, label: `${r.name} (${r.type})` }))}
+                                        placeholder={t('selectRecord')}
+                                    />
+                                </div>
+                            </div>
+                            <div className="input-row">
+                                <label>{t('sourceType')}</label>
+                                <div style={{ flex: 1 }}>
+                                    <CustomSelect
+                                        value={newRotation.ipSource}
+                                        onChange={(e) => setNewRotation({ ...newRotation, ipSource: e.target.value })}
+                                        options={[
+                                            ...(komariEnabled ? [{ value: 'komari', label: t('rotationSourceKomari') }] : []),
+                                            { value: 'manual', label: t('rotationSourceManual') }
+                                        ]}
+                                    />
+                                </div>
+                            </div>
+                            {newRotation.ipSource === 'komari' && (
+                                <div className="input-row">
+                                    <label>{t('komariServers')}</label>
+                                    <div style={{ flex: 1, display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                        {servers.map(s => (
+                                            <label key={s.name} style={{ fontSize: '0.8125rem', display: 'flex', alignItems: 'center', gap: '4px', padding: '2px 6px', background: newRotation.komariServerFilter.includes(s.name) ? '#fff7ed' : '#f9fafb', borderRadius: '6px', cursor: 'pointer', border: '1px solid var(--border)' }}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={newRotation.komariServerFilter.includes(s.name)}
+                                                    onChange={(e) => {
+                                                        if (e.target.checked) {
+                                                            setNewRotation({ ...newRotation, komariServerFilter: [...newRotation.komariServerFilter, s.name] });
+                                                        } else {
+                                                            setNewRotation({ ...newRotation, komariServerFilter: newRotation.komariServerFilter.filter(n => n !== s.name) });
+                                                        }
+                                                    }}
+                                                    style={{ width: '14px', height: '14px' }}
+                                                />
+                                                {s.name}
+                                            </label>
+                                        ))}
+                                        {servers.length === 0 && <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>...</span>}
+                                    </div>
+                                </div>
+                            )}
+                            {newRotation.ipSource === 'manual' && (
+                                <div className="input-row">
+                                    <label>{t('manualIPList')}</label>
+                                    <textarea
+                                        value={(newRotation.manualIPs || []).join('\n')}
+                                        onChange={(e) => setNewRotation({ ...newRotation, manualIPs: e.target.value.split('\n').map(s => s.trim()).filter(Boolean) })}
+                                        placeholder="1.2.3.4&#10;5.6.7.8"
+                                        rows={4}
+                                        style={{ flex: 1, padding: '0.625rem 0.875rem', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '0.875rem', resize: 'vertical', fontFamily: 'monospace' }}
+                                        required
+                                    />
+                                </div>
+                            )}
+                            <div className="input-row">
+                                <label>{t('rotationInterval')}</label>
+                                <div style={{ flex: 1 }}>
+                                    <CustomSelect
+                                        value={newRotation.intervalPreset || 'custom'}
+                                        onChange={(e) => {
+                                            const val = e.target.value;
+                                            if (val === 'custom') {
+                                                setNewRotation({ ...newRotation, intervalPreset: 'custom' });
+                                            } else {
+                                                const secs = parseInt(val);
+                                                setNewRotation({ ...newRotation, interval: secs, intervalPreset: val });
+                                            }
+                                        }}
+                                        options={[
+                                            { value: '3600', label: t('oneHour') },
+                                            { value: '21600', label: t('sixHours') },
+                                            { value: '43200', label: t('twelveHours') },
+                                            { value: '86400', label: t('oneDay') },
+                                            { value: '604800', label: t('oneWeek') },
+                                            { value: 'custom', label: t('customSeconds') }
+                                        ]}
+                                    />
+                                    {newRotation.intervalPreset === 'custom' && (
+                                        <input
+                                            type="number"
+                                            value={newRotation.interval}
+                                            onChange={(e) => setNewRotation({ ...newRotation, interval: parseInt(e.target.value) || 300 })}
+                                            min="300"
+                                            style={{ marginTop: '8px' }}
+                                        />
+                                    )}
+                                </div>
+                            </div>
+                            <div className="input-row" style={{ alignItems: 'center' }}>
+                                <label>{t('status')}</label>
+                                <label className="toggle-switch" style={{ margin: 0 }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={newRotation.enabled}
+                                        onChange={(e) => setNewRotation({ ...newRotation, enabled: e.target.checked })}
+                                    />
+                                    <span className="slider"></span>
+                                </label>
+                                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginLeft: '8px' }}>
+                                    {newRotation.enabled ? t('rotationEnabled') : t('rotationDisabled')}
+                                </span>
+                            </div>
+                            <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.5rem' }}>
+                                <button type="button" className="btn btn-outline" style={{ flex: 1 }} onClick={() => { setShowRotationModal(false); setEditingRotation(null); }}>
+                                    {t('cancel')}
+                                </button>
+                                <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>
+                                    {t('save')}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
 
             {/* DNS Modal */}
             {showDNSModal && (

@@ -2,8 +2,8 @@ export async function onRequest(context) {
     const { request, env, next } = context;
     const url = new URL(request.url);
 
-    // Skip auth for login API
-    if (url.pathname === '/api/login') {
+    // Skip auth for login API and rotation execution
+    if (url.pathname === '/api/login' || url.pathname === '/api/rotations/run') {
         return next();
     }
 

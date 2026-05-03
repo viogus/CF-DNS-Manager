@@ -1,0 +1,8 @@
+name = "cf-dns-manager"
+compatibility_date = "2026-05-03"
+pages_build_output_dir = "dist"
+
+[[kv_namespaces]]
+binding = "DNS_ROTATIONS"
+id = "DNS_ROTATIONS"
+preview_id = "DNS_ROTATIONS_preview"
