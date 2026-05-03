@@ -43,9 +43,11 @@ export async function authenticate(request, env, url) {
       await jwtVerify(token, secret);
 
       const accountIndex = parseInt(request.headers.get('X-Managed-Account-Index') || '0');
-      let serverToken = env.CF_API_TOKEN;
+      let serverToken;
       if (accountIndex > 0) {
         serverToken = env[`CF_API_TOKEN${accountIndex}`];
+      } else {
+        serverToken = env.CF_API_PROXY_TOKEN || env.CF_API_TOKEN;
       }
 
       if (!serverToken) {

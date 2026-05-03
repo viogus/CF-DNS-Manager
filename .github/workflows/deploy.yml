@@ -70,6 +70,7 @@ jobs:
             fi
           }
           upload_secret "CF_API_TOKEN" "${{ secrets.CF_API_TOKEN }}"
+          upload_secret "CF_API_PROXY_TOKEN" "${{ secrets.CF_API_PROXY_TOKEN }}"
           upload_secret "APP_PASSWORD" "${{ secrets.APP_PASSWORD }}"
           upload_secret "CF_API_TOKEN1" "${{ secrets.CF_API_TOKEN1 }}"
           upload_secret "CF_API_TOKEN2" "${{ secrets.CF_API_TOKEN2 }}"
