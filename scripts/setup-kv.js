@@ -68,6 +68,9 @@ async function findOrCreateKV() {
 
 function updateWranglerToml(kvId) {
   let content = readFileSync(WRANGLER_PATH, 'utf8');
+  // Normalize CRLF to LF for consistent matching
+  content = content.replace(/\r\n/g, '\n');
+  const original = content;
 
   // Check if KV section is commented out
   if (content.includes('# [[kv_namespaces]]')) {
@@ -77,6 +80,10 @@ function updateWranglerToml(kvId) {
     );
   } else {
     content = content.replace(/^id\s*=\s*"PLACEHOLDER_KV_ID"/m, `id = "${kvId}"`);
+  }
+
+  if (content === original) {
+    console.warn('Warning: wrangler.toml KV section was not modified. Check the file format.');
   }
 
   if (process.env.CI) {
