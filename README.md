@@ -16,7 +16,7 @@
 - **DNS IP 轮换**（托管模式）：
   - 定时自动更换 DNS 记录的 IP 地址（A/AAAA）
   - 支持 Komari 服务器 IP 池或手动指定 IP 列表
-  - Round-Robin 顺序轮换，可自定义间隔（最短 5 分钟）
+  - Round-Robin 顺序轮换，使用 cron 表达式精确指定轮换时间点
   - 通过 Cloudflare Workers Cron Triggers + KV 实现
 
 
@@ -116,7 +116,7 @@ export default {
 | `ROTATION_API_KEY` | 与 Pages 中 `ROTATION_API_KEY` 相同的密钥 |
 
 6. 在 Worker 的 **设置** → **Cron 触发器** → **添加 Cron 触发器**
-7. 模式输入 `*/5 * * * *`（每 5 分钟），点击 **添加触发器**
+7. 模式输入 `* * * * *`（每分钟），点击 **添加触发器**
 
 ##### 5. 手动触发（无需 Cron Worker）
 
@@ -144,9 +144,10 @@ curl -X POST http://localhost:8788/api/rotations/run \
 
 ##### 注意事项
 
-- 轮换间隔最短为 **300 秒**（5 分钟），建议生产环境设置为 3600 秒以上。
-- Cron Worker 每 5 分钟触发一次，实际是否轮换由每条规则的 `lastRotatedAt + interval` 决定。
+- 每条轮换规则使用 **5 字段 cron 表达式**（分 时 日 月 周）指定执行时间，输入时会实时显示人类可读的含义。
+- Cron Worker 每分钟触发一次，但每条规则只在 cron 表达式匹配的分钟才真正执行轮换，不会浪费 API 配额。
 - 轮换仅支持 **A** 和 **AAAA** 记录，MX/TXT/CNAME 等类型不支持。
+- 常用 cron 示例：`*/5 * * * *`（每 5 分钟）、`0 */6 * * *`（每 6 小时）、`0 3 * * *`（每天凌晨 3 点）、`0 9 * * 1-5`（工作日早上 9 点）。
 - KV 存储的旋转配置通过 meta index 管理，删除所有规则后 meta index 会自动清理。
 - **无需 `wrangler.toml`**：KV 绑定直接在 Dashboard 中配置，`wrangler.toml` 仅用于本地开发参考。
 

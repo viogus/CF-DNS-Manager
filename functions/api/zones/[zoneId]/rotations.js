@@ -1,5 +1,14 @@
 import { getRotation, putRotation, deleteRotation, listRotationsForZone } from '../../rotations/_kv';
 
+const CRON_RE = /^(\*|[0-9]+(?:-[0-9]+)?(?:\/[0-9]+)?|\*\/[0-9]+)(?:,(\*|[0-9]+(?:-[0-9]+)?(?:\/[0-9]+)?|\*\/[0-9]+))*\s+(\*|[0-9]+(?:-[0-9]+)?(?:\/[0-9]+)?|\*\/[0-9]+)(?:,(\*|[0-9]+(?:-[0-9]+)?(?:\/[0-9]+)?|\*\/[0-9]+))*\s+(\*|[0-9]+(?:-[0-9]+)?(?:\/[0-9]+)?|\*\/[0-9]+)(?:,(\*|[0-9]+(?:-[0-9]+)?(?:\/[0-9]+)?|\*\/[0-9]+))*\s+(\*|[0-9]+(?:-[0-9]+)?(?:\/[0-9]+)?|\*\/[0-9]+)(?:,(\*|[0-9]+(?:-[0-9]+)?(?:\/[0-9]+)?|\*\/[0-9]+))*\s+(\*|[0-9]+(?:-[0-9]+)?(?:\/[0-9]+)?|\*\/[0-9]+)(?:,(\*|[0-9]+(?:-[0-9]+)?(?:\/[0-9]+)?|\*\/[0-9]+))*$/;
+
+function isValidCron(expr) {
+  if (typeof expr !== 'string' || !expr.trim()) return false;
+  const parts = expr.trim().split(/\s+/);
+  if (parts.length !== 5) return false;
+  return CRON_RE.test(expr.trim());
+}
+
 export async function onRequestGet(context) {
   const { env, params } = context;
   const { zoneId } = params;
@@ -64,9 +73,8 @@ export async function onRequestPost(context) {
     }
   }
 
-  const interval = parseInt(body.interval) || 86400;
-  if (interval < 300) {
-    return new Response(JSON.stringify({ success: false, error: 'interval must be >= 300 seconds' }), {
+  if (!body.cron || !isValidCron(body.cron)) {
+    return new Response(JSON.stringify({ success: false, error: 'Invalid cron expression. Must be 5-field: minute hour day month weekday' }), {
       status: 400,
       headers: { 'Content-Type': 'application/json' }
     });
@@ -84,7 +92,7 @@ export async function onRequestPost(context) {
     ipSource: body.ipSource,
     manualIPs: body.ipSource === 'manual' ? (body.manualIPs || []) : [],
     komariServerFilter: body.komariServerFilter || [],
-    interval,
+    cron: body.cron.trim(),
     enabled: body.enabled !== false,
     currentIndex: (existing && !ipSourceChanged) ? existing.currentIndex : 0,
     lastRotatedAt: (existing && !ipSourceChanged) ? existing.lastRotatedAt : null,
@@ -123,15 +131,14 @@ export async function onRequestPatch(context) {
   const body = await request.json();
 
   if (body.enabled !== undefined) existing.enabled = !!body.enabled;
-  if (body.interval !== undefined) {
-    const interval = parseInt(body.interval);
-    if (interval < 300) {
-      return new Response(JSON.stringify({ success: false, error: 'interval must be >= 300 seconds' }), {
+  if (body.cron !== undefined) {
+    if (!isValidCron(body.cron)) {
+      return new Response(JSON.stringify({ success: false, error: 'Invalid cron expression' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' }
       });
     }
-    existing.interval = interval;
+    existing.cron = body.cron.trim();
   }
   existing.updatedAt = new Date().toISOString();
 

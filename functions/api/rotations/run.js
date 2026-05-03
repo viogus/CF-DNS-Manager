@@ -72,6 +72,44 @@ async function fetchKomariIPs(env, rotation) {
   }
 }
 
+/** Match a single cron field value against a target number */
+function matchField(field, value) {
+  if (field === '*') return true;
+  // Handle comma-separated values: "1,3,5"
+  if (field.includes(',')) {
+    return field.split(',').some(f => matchField(f, value));
+  }
+  // Handle step: "*/5" or "0/15"
+  if (field.includes('/')) {
+    const [base, step] = field.split('/');
+    const s = parseInt(step);
+    if (base === '*') return value % s === 0;
+    const b = parseInt(base);
+    return value >= b && (value - b) % s === 0;
+  }
+  // Handle range: "1-5"
+  if (field.includes('-')) {
+    const [lo, hi] = field.split('-').map(Number);
+    return value >= lo && value <= hi;
+  }
+  // Exact match
+  return parseInt(field) === value;
+}
+
+/** Check whether a 5-field cron expression matches a given Date */
+function cronMatches(cronExpr, date) {
+  const parts = cronExpr.trim().split(/\s+/);
+  if (parts.length !== 5) return false;
+  const [min, hour, day, month, weekday] = parts;
+  return (
+    matchField(min, date.getUTCMinutes()) &&
+    matchField(hour, date.getUTCHours()) &&
+    matchField(day, date.getUTCDate()) &&
+    matchField(month, date.getUTCMonth() + 1) &&
+    matchField(weekday, date.getUTCDay() === 0 ? 7 : date.getUTCDay()) // Sun=7 in cron
+  );
+}
+
 export async function onRequestPost(context) {
   const { env, data } = context;
 
@@ -86,13 +124,20 @@ export async function onRequestPost(context) {
 
   const rotations = await listAllRotations(env);
   const results = [];
-  const now = Date.now();
+  const now = new Date();
+  const thisMinute = now.toISOString().slice(0, 16); // "2026-05-03T10:37"
 
   for (const rotation of rotations) {
     if (!rotation.enabled) continue;
 
-    const lastRotated = rotation.lastRotatedAt ? new Date(rotation.lastRotatedAt).getTime() : 0;
-    if (now - lastRotated < rotation.interval * 1000) continue;
+    // Check if already rotated this minute (dedup)
+    const lastMinute = rotation.lastRotatedAt
+      ? rotation.lastRotatedAt.slice(0, 16)
+      : '';
+    if (lastMinute === thisMinute) continue;
+
+    // Check if cron expression matches current time
+    if (!rotation.cron || !cronMatches(rotation.cron, now)) continue;
 
     try {
       let ipPool;
@@ -126,7 +171,7 @@ export async function onRequestPost(context) {
 
       if (patchData.success) {
         rotation.currentIndex = (rotation.currentIndex + 1) % ipPool.length;
-        rotation.lastRotatedAt = new Date().toISOString();
+        rotation.lastRotatedAt = now.toISOString();
         rotation.updatedAt = rotation.lastRotatedAt;
         await putRotation(env, rotation);
 

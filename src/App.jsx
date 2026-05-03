@@ -181,7 +181,7 @@ const translations = {
         rotationRules: '轮换规则',
         createRotation: '创建轮换',
         editRotation: '编辑轮换',
-        rotationInterval: '轮换间隔',
+        rotationCron: 'Cron 表达式',
         lastRotated: '上次轮换',
         never: '从未',
         sourceType: 'IP 来源',
@@ -195,14 +195,21 @@ const translations = {
         rotationToggledOn: '轮换已开启',
         rotationToggledOff: '轮换已关闭',
         confirmDeleteRotation: '确定要删除此轮换规则吗？',
-        oneHour: '1 小时',
-        sixHours: '6 小时',
-        twelveHours: '12 小时',
-        oneDay: '1 天',
-        oneWeek: '1 周',
-        customSeconds: '自定义（秒）',
         rotationEnabled: '已启用',
         rotationDisabled: '已停用',
+        // Cron descriptions
+        cronEveryMinute: '每分钟',
+        cronEveryNMinutes: '每 {n} 分钟',
+        cronEveryNHours: '每 {n} 小时整点',
+        cronDailyAt: '每天 {time}',
+        cronWeeklyAt: '每{day} {time}',
+        cronMonday: '周一', cronTuesday: '周二', cronWednesday: '周三',
+        cronThursday: '周四', cronFriday: '周五', cronSaturday: '周六', cronSunday: '周日',
+        cronFormat: '格式',
+        cronExample1: '每5分钟',
+        cronExample2: '每6小时整点',
+        cronExample3: '每天凌晨3点',
+        cronExample4: '工作日早上9点',
     },
     en: {
         title: 'DNS Manager',
@@ -382,7 +389,7 @@ const translations = {
         rotationRules: 'Rotation Rules',
         createRotation: 'Create Rotation',
         editRotation: 'Edit Rotation',
-        rotationInterval: 'Rotation Interval',
+        rotationCron: 'Cron Expression',
         lastRotated: 'Last Rotated',
         never: 'Never',
         sourceType: 'IP Source',
@@ -396,14 +403,21 @@ const translations = {
         rotationToggledOn: 'Rotation enabled',
         rotationToggledOff: 'Rotation disabled',
         confirmDeleteRotation: 'Are you sure you want to delete this rotation rule?',
-        oneHour: '1 Hour',
-        sixHours: '6 Hours',
-        twelveHours: '12 Hours',
-        oneDay: '1 Day',
-        oneWeek: '1 Week',
-        customSeconds: 'Custom (seconds)',
         rotationEnabled: 'Enabled',
         rotationDisabled: 'Disabled',
+        // Cron descriptions
+        cronEveryMinute: 'Every minute',
+        cronEveryNMinutes: 'Every {n} minutes',
+        cronEveryNHours: 'Every {n} hours',
+        cronDailyAt: 'Daily at {time}',
+        cronWeeklyAt: 'Every {day} at {time}',
+        cronMonday: 'Mon', cronTuesday: 'Tue', cronWednesday: 'Wed',
+        cronThursday: 'Thu', cronFriday: 'Fri', cronSaturday: 'Sat', cronSunday: 'Sun',
+        cronFormat: 'Format',
+        cronExample1: 'Every 5 minutes',
+        cronExample2: 'Every 6 hours',
+        cronExample3: 'Daily at 3:00 AM',
+        cronExample4: 'Weekdays at 9:00 AM',
     }
 };
 
@@ -923,8 +937,7 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
         ipSource: 'komari',
         manualIPs: [],
         komariServerFilter: [],
-        interval: 86400,
-        intervalPreset: '86400',
+        cron: '0 3 * * *',
         enabled: true
     };
     const [newRotation, setNewRotation] = useState(defaultRotation);
@@ -941,11 +954,30 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
         setRotationLoading(false);
     };
 
-    const formatInterval = (seconds) => {
-        if (seconds >= 86400 && seconds % 86400 === 0) return `${seconds / 86400}d`;
-        if (seconds >= 3600 && seconds % 3600 === 0) return `${seconds / 3600}h`;
-        if (seconds >= 60 && seconds % 60 === 0) return `${seconds / 60}m`;
-        return `${seconds}s`;
+    const describeCron = (expr) => {
+        if (!expr) return '';
+        const parts = expr.trim().split(/\s+/);
+        if (parts.length !== 5) return expr;
+        const [min, hour, day, month, weekday] = parts;
+
+        // Build human-readable description
+        let desc = '';
+        if (min === '*' && hour === '*' && day === '*' && month === '*' && weekday === '*') {
+            desc = t('cronEveryMinute');
+        } else if (min.startsWith('*/') && hour === '*' && day === '*' && month === '*' && weekday === '*') {
+            desc = t('cronEveryNMinutes').replace('{n}', min.split('/')[1]);
+        } else if (min === '0' && hour.startsWith('*/') && day === '*' && month === '*' && weekday === '*') {
+            desc = t('cronEveryNHours').replace('{n}', hour.split('/')[1]);
+        } else if (min === '0' && !hour.includes('*') && !hour.includes('/') && day === '*' && month === '*' && weekday === '*') {
+            desc = t('cronDailyAt').replace('{time}', hour.padStart(2, '0') + ':' + min.padStart(2, '0'));
+        } else if (min === '0' && !hour.includes('*') && day === '*' && month === '*' && weekday !== '*') {
+            const days = ['', t('cronMonday'), t('cronTuesday'), t('cronWednesday'), t('cronThursday'), t('cronFriday'), t('cronSaturday'), t('cronSunday')];
+            const wd = parseInt(weekday);
+            desc = t('cronWeeklyAt').replace('{day}', days[wd] || weekday).replace('{time}', hour.padStart(2, '0') + ':' + min.padStart(2, '0'));
+        } else {
+            desc = expr; // fallback: show raw cron
+        }
+        return desc;
     };
 
     const toggleRotation = async (rot) => {
@@ -990,8 +1022,6 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
 
     const editRotationStart = (rot) => {
         setEditingRotation(rot);
-        let preset = 'custom';
-        if ([3600, 21600, 43200, 86400, 604800].includes(rot.interval)) preset = String(rot.interval);
         setNewRotation({
             recordId: rot.recordId,
             recordName: rot.recordName,
@@ -999,8 +1029,7 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
             ipSource: rot.ipSource,
             manualIPs: [...(rot.manualIPs || [])],
             komariServerFilter: [...(rot.komariServerFilter || [])],
-            interval: rot.interval,
-            intervalPreset: preset,
+            cron: rot.cron || '0 3 * * *',
             enabled: rot.enabled
         });
         setShowRotationModal(true);
@@ -1020,7 +1049,7 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
                 ipSource: newRotation.ipSource,
                 manualIPs: newRotation.ipSource === 'manual' ? newRotation.manualIPs : [],
                 komariServerFilter: newRotation.ipSource === 'komari' ? newRotation.komariServerFilter : [],
-                interval: newRotation.interval,
+                cron: newRotation.cron,
                 enabled: newRotation.enabled,
                 zoneName: zone.name
             };
@@ -2029,7 +2058,7 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
                                                     <th>{t('name')}</th>
                                                     <th>{t('type')}</th>
                                                     <th>{t('sourceType')}</th>
-                                                    <th>{t('rotationInterval')}</th>
+                                                    <th>{t('rotationCron')}</th>
                                                     <th>{t('lastRotated')}</th>
                                                     <th>{t('status')}</th>
                                                     <th>{t('actions')}</th>
@@ -2043,7 +2072,7 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
                                                         <td style={{ fontSize: '0.8125rem' }}>
                                                             {rot.ipSource === 'komari' ? t('rotationSourceKomari') : t('rotationSourceManual')}
                                                         </td>
-                                                        <td style={{ fontSize: '0.8125rem' }}>{formatInterval(rot.interval)}</td>
+                                                        <td style={{ fontSize: '0.8125rem' }}>{describeCron(rot.cron)}</td>
                                                         <td style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
                                                             {rot.lastRotatedAt ? new Date(rot.lastRotatedAt).toLocaleString() : t('never')}
                                                         </td>
@@ -2088,7 +2117,7 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
                                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                                     <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                                                         <div>{rot.ipSource === 'komari' ? t('rotationSourceKomari') : t('rotationSourceManual')}</div>
-                                                        <div>{formatInterval(rot.interval)} {rot.lastRotatedAt ? '· ' + new Date(rot.lastRotatedAt).toLocaleDateString() : ''}</div>
+                                                        <div>{describeCron(rot.cron)} {rot.lastRotatedAt ? '· ' + new Date(rot.lastRotatedAt).toLocaleDateString() : ''}</div>
                                                     </div>
                                                     <div style={{ display: 'flex', gap: '4px' }}>
                                                         <button className="btn btn-outline" style={{ padding: '0.35rem', border: 'none' }} onClick={() => editRotationStart(rot)}>
@@ -2191,37 +2220,26 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
                                 </div>
                             )}
                             <div className="input-row">
-                                <label>{t('rotationInterval')}</label>
+                                <label>{t('rotationCron')}</label>
                                 <div style={{ flex: 1 }}>
-                                    <CustomSelect
-                                        value={newRotation.intervalPreset || 'custom'}
-                                        onChange={(e) => {
-                                            const val = e.target.value;
-                                            if (val === 'custom') {
-                                                setNewRotation({ ...newRotation, intervalPreset: 'custom' });
-                                            } else {
-                                                const secs = parseInt(val);
-                                                setNewRotation({ ...newRotation, interval: secs, intervalPreset: val });
-                                            }
-                                        }}
-                                        options={[
-                                            { value: '3600', label: t('oneHour') },
-                                            { value: '21600', label: t('sixHours') },
-                                            { value: '43200', label: t('twelveHours') },
-                                            { value: '86400', label: t('oneDay') },
-                                            { value: '604800', label: t('oneWeek') },
-                                            { value: 'custom', label: t('customSeconds') }
-                                        ]}
+                                    <input
+                                        type="text"
+                                        value={newRotation.cron}
+                                        onChange={(e) => setNewRotation({ ...newRotation, cron: e.target.value })}
+                                        placeholder="0 3 * * *"
+                                        style={{ fontFamily: 'monospace', fontSize: '0.9375rem' }}
+                                        required
                                     />
-                                    {newRotation.intervalPreset === 'custom' && (
-                                        <input
-                                            type="number"
-                                            value={newRotation.interval}
-                                            onChange={(e) => setNewRotation({ ...newRotation, interval: parseInt(e.target.value) || 300 })}
-                                            min="300"
-                                            style={{ marginTop: '8px' }}
-                                        />
-                                    )}
+                                    <div style={{ marginTop: '6px', fontSize: '0.8125rem', color: 'var(--primary)', fontWeight: 500 }}>
+                                        → {describeCron(newRotation.cron)}
+                                    </div>
+                                    <div style={{ marginTop: '8px', fontSize: '0.7rem', color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                                        {t('cronFormat')}: 分 时 日 月 周<br/>
+                                        <code style={{ fontSize: '0.7rem', background: '#f8fafc', padding: '2px 4px', borderRadius: '3px' }}>*/5 * * * *</code> {t('cronExample1')}<br/>
+                                        <code style={{ fontSize: '0.7rem', background: '#f8fafc', padding: '2px 4px', borderRadius: '3px' }}>0 */6 * * *</code> {t('cronExample2')}<br/>
+                                        <code style={{ fontSize: '0.7rem', background: '#f8fafc', padding: '2px 4px', borderRadius: '3px' }}>0 3 * * *</code> {t('cronExample3')}<br/>
+                                        <code style={{ fontSize: '0.7rem', background: '#f8fafc', padding: '2px 4px', borderRadius: '3px' }}>0 9 * * 1-5</code> {t('cronExample4')}
+                                    </div>
                                 </div>
                             </div>
                             <div className="input-row" style={{ alignItems: 'center' }}>
