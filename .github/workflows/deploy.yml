@@ -55,17 +55,28 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
 
-      - name: Upload optional secrets
+      - name: Upload secrets
         if: steps.check.outputs.skip != 'true'
-        run: node scripts/setup-secrets.js
+        run: |
+          set -e
+          upload_secret() {
+            local name="$1"
+            local value="$2"
+            if [ -n "$value" ]; then
+              echo "Uploading secret: $name"
+              printf '%s' "$value" | npx wrangler secret put "$name"
+            else
+              echo "Skipping secret: $name (not set)"
+            fi
+          }
+          upload_secret "CF_API_TOKEN" "${{ secrets.CF_API_TOKEN }}"
+          upload_secret "APP_PASSWORD" "${{ secrets.APP_PASSWORD }}"
+          upload_secret "CF_API_TOKEN1" "${{ secrets.CF_API_TOKEN1 }}"
+          upload_secret "CF_API_TOKEN2" "${{ secrets.CF_API_TOKEN2 }}"
+          upload_secret "DNSPOD_SECRET_ID" "${{ secrets.DNSPOD_SECRET_ID }}"
+          upload_secret "DNSPOD_SECRET_KEY" "${{ secrets.DNSPOD_SECRET_KEY }}"
+          upload_secret "KOMARI_BASE_URL" "${{ secrets.KOMARI_BASE_URL }}"
+          upload_secret "KOMARI_API_TOKEN" "${{ secrets.KOMARI_API_TOKEN }}"
+          upload_secret "ROTATION_API_KEY" "${{ secrets.ROTATION_API_KEY }}"
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
-          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
-          APP_PASSWORD: ${{ secrets.APP_PASSWORD }}
-          CF_API_TOKEN1: ${{ secrets.CF_API_TOKEN1 }}
-          CF_API_TOKEN2: ${{ secrets.CF_API_TOKEN2 }}
-          DNSPOD_SECRET_ID: ${{ secrets.DNSPOD_SECRET_ID }}
-          DNSPOD_SECRET_KEY: ${{ secrets.DNSPOD_SECRET_KEY }}
-          KOMARI_BASE_URL: ${{ secrets.KOMARI_BASE_URL }}
-          KOMARI_API_TOKEN: ${{ secrets.KOMARI_API_TOKEN }}
-          ROTATION_API_KEY: ${{ secrets.ROTATION_API_KEY }}
