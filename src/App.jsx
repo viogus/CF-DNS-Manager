@@ -1185,13 +1185,16 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
     useEffect(() => {
         if (tab === 'dns') {
             fetchDNS();
-            setSelectedRecords(new Set()); // Reset selection on tab change
+            setSelectedRecords(new Set());
         }
         if (tab === 'saas') {
             fetchHostnames();
             fetchFallback();
         }
         if (tab === 'rotation') {
+            setRecords([]);          // clear stale zone's records immediately
+            setRotations([]);        // clear stale zone's rotations immediately
+            fetchDNS();
             fetchRotations();
         }
     }, [tab, zone.id]);
