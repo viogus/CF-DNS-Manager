@@ -22,25 +22,37 @@
 
 ## 📋 详细部署指南
 
-### Cloudflare Pages
+### 部署
 
-1. Fork 或克隆本仓库到您的 GitHub 账户
-2. 登录 [Cloudflare Dashboard](https://dash.cloudflare.com/)，进入 Workers 和 Pages 页面
-3. 点击"创建应用-创建 Pages 应用"，连接您的 GitHub 仓库
-4. 框架预设-选择：React(vite)
-5. 点击"保存并部署"
+1. 创建 KV 命名空间：[Cloudflare Dashboard](https://dash.cloudflare.com/) → Workers 和 Pages → KV → 创建命名空间 → 名称 `DNS_ROTATIONS`
+2. 将 KV namespace ID 填入 `wrangler.toml` 的 `[[kv_namespaces]]` 中
+3. 部署：
 
-#### 此时可以使用"本地模式"登录了
+```bash
+npm run deploy
+```
 
-如果需要"托管模式"，请继续设置环境变量：
-1. 在 Cloudflare Pages 控制面板中，点击"设置" > "变量和机密" > 添加类型：密钥
-2. 添加 `APP_PASSWORD` 变量（必须设置）（！！！请使用复杂的密码，如有必要请开启"Cloudflare Access"）
-3. 添加 `CF_API_TOKEN` 变量（必须设置）
-4. 添加 `CF_API_TOKEN1` 变量（可选）
-5. 添加 `CF_API_TOKEN2` 变量（可选）
-6. 返回部署页面，选择"重新部署"
+一条命令完成：前端构建 + Worker 部署 + 静态资源上传 + KV 绑定 + Cron 触发器配置。
+
+#### 环境变量配置
+
+在 Cloudflare Dashboard → Workers 和 Pages → 选择 `cf-dns-manager` Worker → 设置 → 变量 → 添加：
+
+| 变量 | 类型 | 说明 |
+|------|------|------|
+| `APP_PASSWORD` | 密钥 | 管理员密码（托管模式必需） |
+| `CF_API_TOKEN` | 密钥 | Cloudflare API 令牌（必需） |
+| `CF_API_TOKEN1` | 密钥 | 第二个账户令牌（可选） |
+| `CF_API_TOKEN2` | 密钥 | 第三个账户令牌（可选） |
+| `ROTATION_API_KEY` | 密钥 | IP 轮换执行密钥（可选） |
+| `DNSPOD_SECRET_ID` | 密钥 | 腾讯云 SecretId（可选） |
+| `DNSPOD_SECRET_KEY` | 密钥 | 腾讯云 SecretKey（可选） |
+| `KOMARI_BASE_URL` | 文本 | Komari 面板地址（可选） |
+| `KOMARI_API_TOKEN` | 密钥 | Komari API 令牌（可选） |
+
 #### API 令牌权限推荐：区域.DNS.编辑，区域.SSL和证书.编辑
 
+> **注意**：部署后 Worker 的 Cron 触发器会自动生效（每分钟检查一次轮换规则），无需额外配置。
 
 #### DNSPod 集成（可选，托管模式）
 
@@ -64,133 +76,59 @@
 
 #### DNS IP 轮换（可选，托管模式）
 
-如需使用 DNS 记录定时 IP 轮换功能，需要配置 KV 存储和定时触发器。以下所有操作均在 Cloudflare Dashboard 网页中完成，无需终端命令。
+IP 轮换功能随 Worker 部署自动生效，**无需额外配置**。创建 KV 命名空间并将 ID 填入 `wrangler.toml` 后，`npm run deploy` 会同时部署 Cron 触发器。
 
-##### 1. 创建 KV 命名空间
-
-1. 登录 [Cloudflare Dashboard](https://dash.cloudflare.com/)
-2. 左侧菜单：**Workers 和 Pages** → **KV**
-3. 点击 **创建命名空间**
-4. 命名空间名称输入：`DNS_ROTATIONS`，点击 **添加**
-
-##### 2. 绑定 KV 到 Pages 项目
-
-1. 进入你的 Pages 项目 → **设置** → **Functions**
-2. 找到 **KV 命名空间绑定**，点击 **添加绑定**
-3. 变量名：`DNS_ROTATIONS`，命名空间：选择刚创建的 `DNS_ROTATIONS`
-
-##### 3. 添加环境变量
-
-在 Pages 项目 → **设置** → **变量和机密** → 添加类型：**密钥**：
-
-| 变量名 | 说明 |
-|--------|------|
-| `ROTATION_API_KEY` | 轮换执行 API 的认证密钥，自行生成一段复杂随机字符串 |
-
-> **注意**：使用 Komari 作为 IP 来源需已配置 `KOMARI_BASE_URL` 和 `KOMARI_API_TOKEN`。
-
-##### 4. 部署定时触发器（Cron Worker）
-
-1. 在 Cloudflare Dashboard：**Workers 和 Pages** → **创建** → **创建 Worker**
-2. 给 Worker 起个名字（如 `cf-dns-rotator`），点击 **部署**
-3. 点击 **编辑代码**，将以下代码粘贴进去：
-
-```javascript
-export default {
-  async scheduled(event, env, ctx) {
-    const url = env.ROTATION_URL.replace(/\/+$/, '') + '/api/rotations/run';
-    await fetch(url, {
-      method: 'POST',
-      headers: { 'X-Rotation-Key': env.ROTATION_API_KEY }
-    });
-  }
-}
-```
-
-4. 点击 **部署**
-5. 在 Worker 的 **设置** → **变量** 中添加：
-
-| 变量名 | 值 |
-|--------|-----|
-| `ROTATION_URL` | Pages 项目地址，如 `https://cf-dns-manager.pages.dev` |
-| `ROTATION_API_KEY` | 与 Pages 中 `ROTATION_API_KEY` 相同的密钥 |
-
-6. 在 Worker 的 **设置** → **Cron 触发器** → **添加 Cron 触发器**
-7. 模式输入 `* * * * *`（每分钟），点击 **添加触发器**
-
-##### 5. 手动触发（无需 Cron Worker）
-
-即使未部署 Cron Worker，也可以在页面 IP 轮换标签页中：
-- 点击 **Rotate Now** 按钮手动立即执行轮换
-- 保持页面打开时会每 60 秒自动检查并执行到期轮换
-
-##### 6. 本地开发
-
-在 `.dev.vars` 中添加：
-```
-ROTATION_API_KEY=dev-secret-key
-```
-
-测试：
-```bash
-# 方式 1：通过 JWT 认证（浏览器登录后直接调用）
-curl -X POST http://localhost:8788/api/rotations/run \
-  -H "Authorization: Bearer <your-jwt>"
-
-# 方式 2：通过 Rotation Key
-curl -X POST http://localhost:8788/api/rotations/run \
-  -H "X-Rotation-Key: dev-secret-key"
-```
+在页面 IP 轮换标签页中：
+- 创建轮换规则，使用 **5 字段 cron 表达式** 指定执行时间
+- 点击 **Rotate Now** 按钮手动立即执行
+- 保持页面打开时会每 60 秒自动检查
 
 ##### 注意事项
 
 - 每条轮换规则使用 **5 字段 cron 表达式**（分 时 日 月 周）指定执行时间，输入时会实时显示人类可读的含义。
-- Cron Worker 每分钟触发一次，但每条规则只在 cron 表达式匹配的分钟才真正执行轮换，不会浪费 API 配额。
+- Cron 触发器每分钟执行一次，但每条规则只在 cron 表达式匹配的分钟才真正轮换。
 - 轮换仅支持 **A** 和 **AAAA** 记录，MX/TXT/CNAME 等类型不支持。
 - 常用 cron 示例：`*/5 * * * *`（每 5 分钟）、`0 */6 * * *`（每 6 小时）、`0 3 * * *`（每天凌晨 3 点）、`0 9 * * 1-5`（工作日早上 9 点）。
-- KV 存储的旋转配置通过 meta index 管理，删除所有规则后 meta index 会自动清理。
-- **无需 `wrangler.toml`**：KV 绑定直接在 Dashboard 中配置，`wrangler.toml` 仅用于本地开发参考。
 
 ---
 
 ## 🏗️ 项目架构
 
-本项目采用 **边缘原生 (Edge-Native)** 全栈架构，完全运行在 Cloudflare 生态中：
+本项目采用 **Cloudflare Worker** 全栈架构：
 
-- **Frontend**: 基于 React 18 与 Vite 构建的单页应用 (SPA)，通过 Cloudflare Pages 全球分发。
-- **Backend**: 使用 Cloudflare Pages Functions 实现 Serverless API，运行在边缘节点。
+- **Frontend**: React 18 + Vite 构建的 SPA，通过 Worker Assets 全球分发。
+- **Backend**: Worker 统一处理 API 路由 + 认证中间件 + Cron 定时任务。
+- **Storage**: Cloudflare KV 存储轮换配置。
 - **Security**: 
     - **托管模式**：后端校验 `APP_PASSWORD` 并颁发基于 `jose` 签名的 JWT 令牌。
     - **本地模式**：前端令牌通过自定义 Header 经后端透明代理，不经过任何持久化存储。
-- **Middleware**: 自动拦截并校验所有 API 请求的身份合法性。
+- **Middleware**: Worker 入口处统一认证，支持 Client Token / Rotation Key / JWT 三种方式。
 
 
 ## 开发与部署
 
-### 开发环境
+### 本地开发
 1. **安装依赖**：
    ```bash
    npm install
    ```
-2. **启动开发服务器**：
+2. **启动前端开发服务器**（仅前端，无后端）：
    ```bash
-   # 模拟本地模式
    npm run dev
-   
-   # 模拟托管模式 (需安装 wrangler)
-   # 创建 .dev.vars 文件配置环境变量
-   npx wrangler pages dev ./dist
    ```
+3. **启动完整 Worker 开发服务器**（前端 + 后端 + KV + Cron）：
+   ```bash
+   npx wrangler dev
+   ```
+   创建 `.dev.vars` 文件配置环境变量（参考上方环境变量表）。
 
 ### 生产部署
-1. **编译打包**：
-   ```bash
-   npm run build
-   ```
-2. **发布至 Pages**：
-   ```bash
-   npx wrangler pages deploy dist
-   ```
+
+```bash
+npm run deploy
+```
+
+等价于 `npm run build && wrangler deploy`，一条命令完成：Vite 构建 + Worker 部署 + 静态资源 + KV 绑定 + Cron 触发器。
 
 ---
 *由 [Antigravity](https://github.com/google-deepmind) 驱动开发*
