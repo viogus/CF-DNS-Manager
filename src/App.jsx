@@ -1042,6 +1042,46 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
         }
     };
 
+    const [rotatingNow, setRotatingNow] = useState(false);
+    const handleRotateNow = async () => {
+        setRotatingNow(true);
+        try {
+            const res = await fetch('/api/rotations/run', {
+                method: 'POST',
+                headers: getHeaders()
+            });
+            const data = await res.json();
+            if (data.success) {
+                const rotatedCount = data.rotated || 0;
+                showToast(rotatedCount > 0
+                    ? `${rotatedCount} record(s) rotated`
+                    : 'No rotations due yet');
+                fetchRotations();
+            } else {
+                showToast(data.error || t('errorOccurred'), 'error');
+            }
+        } catch (e) {
+            showToast(t('errorOccurred'), 'error');
+        }
+        setRotatingNow(false);
+    };
+
+    // Auto-poll rotation when tab is active (fallback scheduler)
+    useEffect(() => {
+        if (tab !== 'rotation') return;
+        const interval = setInterval(() => {
+            fetch('/api/rotations/run', {
+                method: 'POST',
+                headers: getHeaders()
+            }).then(res => res.json()).then(data => {
+                if (data.success && data.rotated > 0) {
+                    fetchRotations();
+                }
+            }).catch(() => {});
+        }, 60000);
+        return () => clearInterval(interval);
+    }, [tab, zone.id]);
+
     const getHeaders = (withType = false) => getAuthHeaders(auth, withType);
 
     const fetchDNS = async () => {
@@ -1654,12 +1694,18 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
                                     <Plus size={16} /> <span className="btn-text">{t('addSaaS')}</span>
                                 </button>
                             ) : (
-                                <button className="btn btn-primary" onClick={() => {
-                                    setEditingRotation(null);
-                                    setShowRotationModal(true);
-                                }}>
-                                    <Plus size={16} /> <span className="btn-text">{t('createRotation')}</span>
-                                </button>
+                                <>
+                                    <button className="btn btn-outline" onClick={handleRotateNow} disabled={rotatingNow}>
+                                        <RefreshCw size={16} className={rotatingNow ? 'spin' : ''} />
+                                        <span className="btn-text">Rotate Now</span>
+                                    </button>
+                                    <button className="btn btn-primary" onClick={() => {
+                                        setEditingRotation(null);
+                                        setShowRotationModal(true);
+                                    }}>
+                                        <Plus size={16} /> <span className="btn-text">{t('createRotation')}</span>
+                                    </button>
+                                </>
                             )}
                         </div>
                     </div>

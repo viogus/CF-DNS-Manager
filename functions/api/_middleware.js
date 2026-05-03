@@ -2,14 +2,15 @@ export async function onRequest(context) {
     const { request, env, next } = context;
     const url = new URL(request.url);
 
-    // Skip auth for login API and rotation execution
-    if (url.pathname === '/api/login' || url.pathname === '/api/rotations/run') {
+    // Skip auth for login API only
+    if (url.pathname === '/api/login') {
         return next();
     }
 
     // Get tokens from headers
     const clientToken = request.headers.get('X-Cloudflare-Token');
     const authHeader = request.headers.get('Authorization');
+    const rotationKey = request.headers.get('X-Rotation-Key');
 
     // Priority 1: Client Mode (Token provided directly by user)
     if (clientToken) {
@@ -17,7 +18,15 @@ export async function onRequest(context) {
         return next();
     }
 
-    // Priority 2: Server Mode (JWT provided, using server's CF_API_TOKEN)
+    // Priority 2: Rotation Key (cron Worker trigger)
+    if (rotationKey && env.ROTATION_API_KEY && rotationKey === env.ROTATION_API_KEY) {
+        context.data.cfToken = env.CF_API_TOKEN;
+        context.data.komariBaseUrl = env.KOMARI_BASE_URL;
+        context.data.komariApiToken = env.KOMARI_API_TOKEN;
+        return next();
+    }
+
+    // Priority 3: Server Mode (JWT provided, using server's CF_API_TOKEN)
     if (authHeader && authHeader.startsWith('Bearer ')) {
         const token = authHeader.substring(7);
         const serverSecret = env.APP_PASSWORD;
@@ -67,7 +76,7 @@ export async function onRequest(context) {
     // No valid auth method found
     return new Response(JSON.stringify({
         error: 'Authentication Required',
-        message: 'Please provide either X-Cloudflare-Token or a valid Authorization header.'
+        message: 'Please provide either X-Cloudflare-Token, X-Rotation-Key, or a valid Authorization header.'
     }), {
         status: 401,
         headers: { 'Content-Type': 'application/json' }

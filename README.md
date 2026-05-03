@@ -64,49 +64,80 @@
 
 #### DNS IP 轮换（可选，托管模式）
 
-如需使用 DNS 记录定时 IP 轮换功能，需要额外配置 KV 存储和 Cron Worker：
+如需使用 DNS 记录定时 IP 轮换功能，需要配置 KV 存储和定时触发器。以下所有操作均在 Cloudflare Dashboard 网页中完成，无需终端命令。
 
 ##### 1. 创建 KV 命名空间
 
-```bash
-npx wrangler kv:namespace create DNS_ROTATIONS
-npx wrangler kv:namespace create DNS_ROTATIONS --preview
-```
+1. 登录 [Cloudflare Dashboard](https://dash.cloudflare.com/)
+2. 左侧菜单：**Workers 和 Pages** → **KV**
+3. 点击 **创建命名空间**
+4. 命名空间名称输入：`DNS_ROTATIONS`，点击 **添加**
 
-将输出的 `id` 和 `preview_id` 填入 `wrangler.toml` 的 `[[kv_namespaces]]` 中。
+##### 2. 绑定 KV 到 Pages 项目
 
-##### 2. 绑定 KV 到 Pages
-
-在 Cloudflare Pages 控制面板：设置 → Functions → KV 命名空间绑定 → 添加 `DNS_ROTATIONS` 绑定。
+1. 进入你的 Pages 项目 → **设置** → **Functions**
+2. 找到 **KV 命名空间绑定**，点击 **添加绑定**
+3. 变量名：`DNS_ROTATIONS`，命名空间：选择刚创建的 `DNS_ROTATIONS`
 
 ##### 3. 添加环境变量
 
-| 变量 | 说明 |
-|------|------|
-| `ROTATION_API_KEY` | 轮换执行 API 的认证密钥（自行生成复杂随机字符串） |
+在 Pages 项目 → **设置** → **变量和机密** → 添加类型：**密钥**：
 
-> **注意**：如果使用 Komari 作为 IP 来源，还需要已配置 `KOMARI_BASE_URL` 和 `KOMARI_API_TOKEN`。
+| 变量名 | 说明 |
+|--------|------|
+| `ROTATION_API_KEY` | 轮换执行 API 的认证密钥，自行生成一段复杂随机字符串 |
 
-##### 4. 部署 Cron Worker
+> **注意**：使用 Komari 作为 IP 来源需已配置 `KOMARI_BASE_URL` 和 `KOMARI_API_TOKEN`。
 
-```bash
-npx wrangler deploy workers/rotate-trigger.js --name cf-dns-rotator --cron "*/5 * * * *"
+##### 4. 部署定时触发器（Cron Worker）
+
+1. 在 Cloudflare Dashboard：**Workers 和 Pages** → **创建** → **创建 Worker**
+2. 给 Worker 起个名字（如 `cf-dns-rotator`），点击 **部署**
+3. 点击 **编辑代码**，将以下代码粘贴进去：
+
+```javascript
+export default {
+  async scheduled(event, env, ctx) {
+    const url = env.ROTATION_URL.replace(/\/+$/, '') + '/api/rotations/run';
+    await fetch(url, {
+      method: 'POST',
+      headers: { 'X-Rotation-Key': env.ROTATION_API_KEY }
+    });
+  }
+}
 ```
 
-部署后，在 Cloudflare Dashboard 为 Worker 设置环境变量：
-- `ROTATION_URL`：Pages 部署地址，如 `https://cf-dns-manager.pages.dev`
-- `ROTATION_API_KEY`：与 Pages 中 `ROTATION_API_KEY` 相同的密钥
+4. 点击 **部署**
+5. 在 Worker 的 **设置** → **变量** 中添加：
 
-##### 5. 本地开发
+| 变量名 | 值 |
+|--------|-----|
+| `ROTATION_URL` | Pages 项目地址，如 `https://cf-dns-manager.pages.dev` |
+| `ROTATION_API_KEY` | 与 Pages 中 `ROTATION_API_KEY` 相同的密钥 |
+
+6. 在 Worker 的 **设置** → **Cron 触发器** → **添加 Cron 触发器**
+7. 模式输入 `*/5 * * * *`（每 5 分钟），点击 **添加触发器**
+
+##### 5. 手动触发（无需 Cron Worker）
+
+即使未部署 Cron Worker，也可以在页面 IP 轮换标签页中：
+- 点击 **Rotate Now** 按钮手动立即执行轮换
+- 保持页面打开时会每 60 秒自动检查并执行到期轮换
+
+##### 6. 本地开发
 
 在 `.dev.vars` 中添加：
 ```
 ROTATION_API_KEY=dev-secret-key
-DNS_ROTATIONS=<preview 命名空间 ID>
 ```
 
-测试轮换执行：
+测试：
 ```bash
+# 方式 1：通过 JWT 认证（浏览器登录后直接调用）
+curl -X POST http://localhost:8788/api/rotations/run \
+  -H "Authorization: Bearer <your-jwt>"
+
+# 方式 2：通过 Rotation Key
 curl -X POST http://localhost:8788/api/rotations/run \
   -H "X-Rotation-Key: dev-secret-key"
 ```
@@ -114,10 +145,10 @@ curl -X POST http://localhost:8788/api/rotations/run \
 ##### 注意事项
 
 - 轮换间隔最短为 **300 秒**（5 分钟），建议生产环境设置为 3600 秒以上。
-- Cron Worker 每 5 分钟触发一次，但实际是否轮换由每条规则的 `lastRotatedAt + interval` 决定，不会频繁执行。
+- Cron Worker 每 5 分钟触发一次，实际是否轮换由每条规则的 `lastRotatedAt + interval` 决定。
 - 轮换仅支持 **A** 和 **AAAA** 记录，MX/TXT/CNAME 等类型不支持。
 - KV 存储的旋转配置通过 meta index 管理，删除所有规则后 meta index 会自动清理。
-- 多账户场景下，轮换使用 `CF_API_TOKEN`（account index 0），如需指定账户请修改 KV 中的配置。
+- **无需 `wrangler.toml`**：KV 绑定直接在 Dashboard 中配置，`wrangler.toml` 仅用于本地开发参考。
 
 ---
 

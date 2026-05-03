@@ -73,10 +73,11 @@ async function fetchKomariIPs(env, rotation) {
 }
 
 export async function onRequestPost(context) {
-  const { request, env } = context;
+  const { env, data } = context;
 
-  const rotationKey = request.headers.get('X-Rotation-Key');
-  if (!rotationKey || rotationKey !== env.ROTATION_API_KEY) {
+  // Auth handled by middleware — use the injected cfToken
+  const cfToken = data.cfToken || env.CF_API_TOKEN;
+  if (!cfToken) {
     return new Response(JSON.stringify({ success: false, error: 'Unauthorized' }), {
       status: 401,
       headers: { 'Content-Type': 'application/json' }
@@ -109,7 +110,6 @@ export async function onRequestPost(context) {
       const newIndex = rotation.currentIndex % ipPool.length;
       const newIP = ipPool[newIndex];
 
-      const cfToken = env.CF_API_TOKEN;
       const patchRes = await fetch(
         `https://api.cloudflare.com/client/v4/zones/${rotation.zoneId}/dns_records/${rotation.recordId}`,
         {
