@@ -2724,12 +2724,24 @@ const App = () => {
         toastTimer.current = setTimeout(() => setToast(null), 3000);
     };
 
+    const handleLogout = () => {
+        setAuth(null);
+        setZones([]);
+        setSelectedZone(null);
+        localStorage.removeItem('auth_session');
+        sessionStorage.removeItem('auth_session');
+    };
+
     const fetchZones = async (credentials) => {
         setLoading(true);
         const headers = getAuthHeaders(credentials);
 
         try {
             const res = await fetch('/api/zones', { headers });
+            if (res.status === 401 || res.status === 403) {
+                handleLogout();
+                return;
+            }
             const data = await res.json();
             if (res.ok) {
                 const sortedZones = (data.result || []).sort((a, b) =>
@@ -2784,14 +2796,6 @@ const App = () => {
             sessionStorage.setItem('auth_session', JSON.stringify(credentials));
         }
         fetchZones(credentials);
-    };
-
-    const handleLogout = () => {
-        setAuth(null);
-        setZones([]);
-        setSelectedZone(null);
-        localStorage.removeItem('auth_session');
-        sessionStorage.removeItem('auth_session');
     };
 
     if (!auth) {
