@@ -1,4 +1,4 @@
-import { getRotation, putRotation, deleteRotation, listRotationsForZone } from '../rotations/_kv';
+import { getRotation, putRotation, deleteRotation, listRotationsForZone } from '../../rotations/_kv';
 
 export async function onRequestGet(context) {
   const { env, params } = context;
