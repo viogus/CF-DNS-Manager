@@ -982,11 +982,14 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
             delete payload.content;
             if (payload.type === 'SRV' || payload.type === 'URI') {
                 delete payload.priority; // Priority is inside data for SRV/URI
-                // Ensure data.name is sync with record name for SRV
                 if (payload.type === 'SRV' && payload.name) {
                     payload.data = { ...payload.data, name: payload.name };
                 }
             }
+        }
+        // proxied is only valid for A, AAAA, CNAME
+        if (!['A', 'AAAA', 'CNAME'].includes(payload.type)) {
+            delete payload.proxied;
         }
 
         const res = await fetch(url, {
@@ -1607,6 +1610,14 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
                         </>
                     ) : (
                         <>
+                            {error && (
+                                <div className="glass-card" style={{ padding: '1rem', marginBottom: '1rem', background: '#fff5f5', border: '1px solid #feb2b2' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <AlertCircle size={16} color="var(--error)" />
+                                        <span style={{ fontSize: '0.875rem', color: 'var(--error)' }}>{error}</span>
+                                    </div>
+                                </div>
+                            )}
                             <div className="glass-card" style={{ padding: '1.25rem', marginBottom: '1.5rem', background: '#f8fafc' }}>
                                 <div className="flex-stack">
                                     <div style={{ flex: 1 }}>
