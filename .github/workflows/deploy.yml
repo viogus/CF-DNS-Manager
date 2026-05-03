@@ -49,6 +49,12 @@ jobs:
           CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
           CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
 
+      - name: Deploy
+        if: steps.check.outputs.skip != 'true'
+        run: npx wrangler deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+
       - name: Upload optional secrets
         if: steps.check.outputs.skip != 'true'
         run: node scripts/setup-secrets.js
@@ -63,9 +69,3 @@ jobs:
           KOMARI_BASE_URL: ${{ secrets.KOMARI_BASE_URL }}
           KOMARI_API_TOKEN: ${{ secrets.KOMARI_API_TOKEN }}
           ROTATION_API_KEY: ${{ secrets.ROTATION_API_KEY }}
-
-      - name: Deploy
-        if: steps.check.outputs.skip != 'true'
-        run: npx wrangler deploy
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
