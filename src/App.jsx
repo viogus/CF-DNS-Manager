@@ -65,15 +65,12 @@ const App = () => {
                 return;
             }
             const data = await res.json();
-            if (res.ok) {
+            if (res.ok && data.success) {
                 const sortedZones = (data.result || []).sort((a, b) =>
                     new Date(b.modified_on) - new Date(a.modified_on)
                 );
                 setZones(sortedZones);
 
-                // Auto-select logic:
-                // 1. If we have a currently selected zone, try to keep it (update with new data)
-                // 2. If no selection or current one is gone, select the first one
                 if (sortedZones.length > 0) {
                     if (selectedZone) {
                         const stillExists = sortedZones.find(z => z.id === selectedZone.id);
@@ -88,6 +85,11 @@ const App = () => {
                 } else {
                     setSelectedZone(null);
                 }
+            } else if (data.errors && data.errors.length > 0) {
+                const msg = data.errors[0].message || t('fetchZonesFailed');
+                showToast(msg, 'error');
+            } else if (!res.ok) {
+                showToast(`${t('fetchZonesFailed')} (${res.status})`, 'error');
             }
         } catch (err) { }
         setLoading(false);
