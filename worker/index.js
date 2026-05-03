@@ -116,8 +116,6 @@ async function handleRequest(request, env) {
     // Dispatch to handler
     if (handlerFn && handler[handlerFn]) {
       return handler[handlerFn](request, env, params, data);
-    } else if (handler.onRequest) {
-      return handler.onRequest({ request, env, params, data });
     }
     return new Response(JSON.stringify({ error: 'Method Not Allowed' }), {
       status: 405,

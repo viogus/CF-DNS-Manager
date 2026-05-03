@@ -41,9 +41,35 @@ function normalizeServers(payload) {
   return servers;
 }
 
-async function fetchKomariIPs(env, rotation) {
+async function fetchKomariServers(env) {
   const baseUrl = env.KOMARI_BASE_URL;
   const apiToken = env.KOMARI_API_TOKEN;
+  if (!baseUrl) return [];
+  try {
+    let apiBase = baseUrl.trim().replace(/\/+$/, '');
+    if (!/\/api$/.test(apiBase)) apiBase += '/api';
+    const url = `${apiBase}/admin/client/list`;
+    const headers = {};
+    if (apiToken) headers['Authorization'] = `Bearer ${apiToken}`;
+    const res = await fetch(url, { headers });
+    if (!res.ok) return [];
+    const payload = await res.json();
+    return normalizeServers(payload);
+  } catch { return []; }
+}
+
+function getIPsFromServers(servers, rotation) {
+  let filtered = servers;
+  if (rotation.komariServerFilter && rotation.komariServerFilter.length > 0) {
+    filtered = servers.filter(s => rotation.komariServerFilter.includes(s.name));
+  }
+  return rotation.recordType === 'AAAA'
+    ? filtered.flatMap(s => s.ipv6)
+    : filtered.flatMap(s => s.ipv4);
+}
+
+async function fetchKomariIPs(env, rotation) {
+  const baseUrl = env.KOMARI_BASE_URL;
   if (!baseUrl) return [];
 
   try {
@@ -122,6 +148,13 @@ export async function runRotations(env) {
   const thisMinute = now.toISOString().slice(0, 16);
   const cfToken = env.CF_API_TOKEN;
 
+  // Fetch Komari IPs once before the loop (shared across all rotations using komari)
+  let komariServers = null;
+  const komariNeeded = rotations.some(r => r.enabled && r.ipSource === 'komari');
+  if (komariNeeded) {
+    try { komariServers = await fetchKomariServers(env); } catch { komariServers = []; }
+  }
+
   for (const rotation of rotations) {
     if (!rotation.enabled) continue;
     const lastMinute = rotation.lastRotatedAt ? rotation.lastRotatedAt.slice(0, 16) : '';
@@ -131,7 +164,9 @@ export async function runRotations(env) {
     try {
       let ipPool;
       if (rotation.ipSource === 'komari') {
-        ipPool = await fetchKomariIPs(env, rotation);
+        ipPool = komariServers
+          ? getIPsFromServers(komariServers, rotation)
+          : await fetchKomariIPs(env, rotation);
       } else {
         ipPool = rotation.manualIPs || [];
       }
