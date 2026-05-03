@@ -20,37 +20,46 @@
   - 通过 Cloudflare Workers Cron Triggers + KV 实现
 
 
-## 📋 详细部署指南
+## 📋 一键部署（GitHub Actions）
 
-### 部署
+Fork 仓库后，只需在 GitHub Settings → Secrets and variables → Actions 中设置以下 Secrets，然后 push 代码即可自动部署。**无需打开 Cloudflare Dashboard，无需创建 KV 命名空间，无需终端命令。**
 
-1. 创建 KV 命名空间：[Cloudflare Dashboard](https://dash.cloudflare.com/) → Workers 和 Pages → KV → 创建命名空间 → 名称 `DNS_ROTATIONS`
-2. 将 KV namespace ID 填入 `wrangler.toml` 的 `[[kv_namespaces]]` 中
-3. 部署：
+### 必需的 GitHub Secrets
+
+| Secret | 说明 |
+|--------|------|
+| `CF_API_TOKEN` | Cloudflare API 令牌（需要 Workers、KV 编辑权限） |
+| `CF_ACCOUNT_ID` | Cloudflare 账户 ID（Dashboard URL 中可见） |
+
+### 可选的 GitHub Secrets
+
+| Secret | 说明 |
+|--------|------|
+| `APP_PASSWORD` | 管理员密码（托管模式必需） |
+| `ROTATION_API_KEY` | IP 轮换执行密钥 |
+| `DNSPOD_SECRET_ID` | 腾讯云 SecretId |
+| `DNSPOD_SECRET_KEY` | 腾讯云 SecretKey |
+| `KOMARI_BASE_URL` | Komari 面板地址 |
+| `KOMARI_API_TOKEN` | Komari API 令牌 |
+
+### 部署流程
+
+1. Fork 本仓库
+2. 在仓库 Settings → Secrets and variables → Actions → 添加以上 Secrets
+3. Push 任意提交到 `main` 分支（或手动触发 Actions 中的 Deploy workflow）
+
+GitHub Actions 自动执行：检出代码 → 安装依赖 → 构建前端 → **自动创建 KV 命名空间** → 部署 Worker + 静态资源 + Cron 触发器 + 写入 Secrets。
+
+### 本地部署
+
+如果需要在本地部署而非通过 GitHub Actions：
 
 ```bash
 npm run deploy
 ```
 
-一条命令完成：前端构建 + Worker 部署 + 静态资源上传 + KV 绑定 + Cron 触发器配置。
-
-#### 环境变量配置
-
-在 Cloudflare Dashboard → Workers 和 Pages → 选择 `cf-dns-manager` Worker → 设置 → 变量 → 添加：
-
-| 变量 | 类型 | 说明 |
-|------|------|------|
-| `APP_PASSWORD` | 密钥 | 管理员密码（托管模式必需） |
-| `CF_API_TOKEN` | 密钥 | Cloudflare API 令牌（必需） |
-| `CF_API_TOKEN1` | 密钥 | 第二个账户令牌（可选） |
-| `CF_API_TOKEN2` | 密钥 | 第三个账户令牌（可选） |
-| `ROTATION_API_KEY` | 密钥 | IP 轮换执行密钥（可选） |
-| `DNSPOD_SECRET_ID` | 密钥 | 腾讯云 SecretId（可选） |
-| `DNSPOD_SECRET_KEY` | 密钥 | 腾讯云 SecretKey（可选） |
-| `KOMARI_BASE_URL` | 文本 | Komari 面板地址（可选） |
-| `KOMARI_API_TOKEN` | 密钥 | Komari API 令牌（可选） |
-
-#### API 令牌权限推荐：区域.DNS.编辑，区域.SSL和证书.编辑
+> 本地部署需要先在 `wrangler.toml` 中手动填入 KV namespace ID，或先运行 `node scripts/setup-kv.js`。
+> **API 令牌权限推荐**：`CF_API_TOKEN`（用于 DNS/SSL 代理）需要 区域.DNS.编辑 + 区域.SSL和证书.编辑；`CF_API_TOKEN`（用于 GitHub Actions/KV）还需要 Workers 和 KV 编辑权限。可以使用两个不同的令牌。
 
 > **注意**：部署后 Worker 的 Cron 触发器会自动生效（每分钟检查一次轮换规则），无需额外配置。
 

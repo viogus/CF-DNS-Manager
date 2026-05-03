@@ -7,7 +7,7 @@ directory = "dist"
 
 [[kv_namespaces]]
 binding = "DNS_ROTATIONS"
-id = "DNS_ROTATIONS"
+id = "PLACEHOLDER_KV_ID"
 
 [triggers]
 crons = ["* * * * *"]
