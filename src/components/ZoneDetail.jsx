@@ -134,7 +134,7 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
         recordName: '',
         recordType: 'A',
         ipSource: 'komari',
-        manualIPs: [],
+        manualIPs: '',
         komariServerFilter: [],
         cron: '0 3 * * *',
         enabled: true
@@ -226,7 +226,7 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
             recordName: rot.recordName,
             recordType: rot.recordType,
             ipSource: rot.ipSource,
-            manualIPs: [...(rot.manualIPs || [])],
+            manualIPs: (rot.manualIPs || []).join('\n'),
             komariServerFilter: [...(rot.komariServerFilter || [])],
             cron: rot.cron || '0 3 * * *',
             enabled: rot.enabled
@@ -246,7 +246,7 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
                 recordName: newRotation.recordName,
                 recordType: newRotation.recordType,
                 ipSource: newRotation.ipSource,
-                manualIPs: newRotation.ipSource === 'manual' ? newRotation.manualIPs : [],
+                manualIPs: newRotation.ipSource === 'manual' ? newRotation.manualIPs.split('\n').map(s => s.trim()).filter(Boolean) : [],
                 komariServerFilter: newRotation.ipSource === 'komari' ? newRotation.komariServerFilter : [],
                 cron: newRotation.cron,
                 enabled: newRotation.enabled,
@@ -1408,8 +1408,8 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
                                 <div className="input-row">
                                     <label>{t('manualIPList')}</label>
                                     <textarea
-                                        value={(newRotation.manualIPs || []).join('\n')}
-                                        onChange={(e) => setNewRotation({ ...newRotation, manualIPs: e.target.value.split('\n').map(s => s.trim()).filter(Boolean) })}
+                                        value={newRotation.manualIPs}
+                                        onChange={(e) => setNewRotation({ ...newRotation, manualIPs: e.target.value })}
                                         placeholder="1.2.3.4&#10;5.6.7.8"
                                         rows={4}
                                         style={{ flex: 1, padding: '0.625rem 0.875rem', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '0.875rem', resize: 'vertical', fontFamily: 'monospace' }}
