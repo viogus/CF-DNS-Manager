@@ -11,7 +11,7 @@ function zonePrefix(zoneId) {
 
 function kv(env) {
   if (!env.DNS_ROTATIONS) {
-    throw new Error('KV namespace DNS_ROTATIONS is not bound. Configure it in Cloudflare Dashboard: Workers & Pages → KV → create namespace, then bind in wrangler.toml.');
+    throw new Error('KV namespace DNS_ROTATIONS is not bound. Create a KV namespace (wrangler kv namespace create DNS_ROTATIONS, or Cloudflare Dashboard: Workers & Pages > KV) and set its ID in [[kv_namespaces]] in wrangler.toml.');
   }
   return env.DNS_ROTATIONS;
 }
