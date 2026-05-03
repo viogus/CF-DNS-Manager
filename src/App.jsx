@@ -964,13 +964,13 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
         let desc = '';
         if (min === '*' && hour === '*' && day === '*' && month === '*' && weekday === '*') {
             desc = t('cronEveryMinute');
-        } else if (min.startsWith('*/') && hour === '*' && day === '*' && month === '*' && weekday === '*') {
+        } else if (min.startsWith('*/') && !min.includes(',') && hour === '*' && day === '*' && month === '*' && weekday === '*') {
             desc = t('cronEveryNMinutes').replace('{n}', min.split('/')[1]);
-        } else if (min === '0' && hour.startsWith('*/') && day === '*' && month === '*' && weekday === '*') {
+        } else if (min === '0' && hour.startsWith('*/') && !hour.includes(',') && day === '*' && month === '*' && weekday === '*') {
             desc = t('cronEveryNHours').replace('{n}', hour.split('/')[1]);
-        } else if (min === '0' && !hour.includes('*') && !hour.includes('/') && day === '*' && month === '*' && weekday === '*') {
+        } else if (!hour.includes('*') && !hour.includes('/') && day === '*' && month === '*' && weekday === '*') {
             desc = t('cronDailyAt').replace('{time}', hour.padStart(2, '0') + ':' + min.padStart(2, '0'));
-        } else if (min === '0' && !hour.includes('*') && day === '*' && month === '*' && weekday !== '*') {
+        } else if (!hour.includes('*') && !hour.includes('/') && !weekday.includes('-') && !weekday.includes(',') && day === '*' && month === '*' && weekday !== '*') {
             const days = ['', t('cronMonday'), t('cronTuesday'), t('cronWednesday'), t('cronThursday'), t('cronFriday'), t('cronSaturday'), t('cronSunday')];
             const wd = parseInt(weekday);
             desc = t('cronWeeklyAt').replace('{day}', days[wd] || weekday).replace('{time}', hour.padStart(2, '0') + ':' + min.padStart(2, '0'));

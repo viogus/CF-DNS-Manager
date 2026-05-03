@@ -79,11 +79,16 @@ function matchField(field, value) {
   if (field.includes(',')) {
     return field.split(',').some(f => matchField(f, value));
   }
-  // Handle step: "*/5" or "0/15"
+  // Handle step: "*/5", "0/15", or "1-5/2"
   if (field.includes('/')) {
     const [base, step] = field.split('/');
     const s = parseInt(step);
     if (base === '*') return value % s === 0;
+    // Check for range base: "1-5/2"
+    if (base.includes('-')) {
+      const [lo, hi] = base.split('-').map(Number);
+      return value >= lo && value <= hi && (value - lo) % s === 0;
+    }
     const b = parseInt(base);
     return value >= b && (value - b) % s === 0;
   }
