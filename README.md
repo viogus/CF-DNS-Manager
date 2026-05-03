@@ -36,11 +36,15 @@ Fork 仓库后，只需在 GitHub Settings → Secrets and variables → Actions
 | Secret | 说明 |
 |--------|------|
 | `APP_PASSWORD` | 管理员密码（托管模式必需） |
+| `CF_API_TOKEN1` | 第二个 Cloudflare 账户令牌（多账户支持） |
+| `CF_API_TOKEN2` | 第三个 Cloudflare 账户令牌（多账户支持） |
 | `ROTATION_API_KEY` | IP 轮换执行密钥 |
 | `DNSPOD_SECRET_ID` | 腾讯云 SecretId |
 | `DNSPOD_SECRET_KEY` | 腾讯云 SecretKey |
 | `KOMARI_BASE_URL` | Komari 面板地址 |
 | `KOMARI_API_TOKEN` | Komari API 令牌 |
+
+> **建议**：`CF_API_TOKEN` 同时用于部署和 Worker 运行时。如需分离权限，可创建两个令牌——一个用于 GitHub Actions（Workers + KV 编辑），另一个用于 Worker 运行时（DNS + SSL 编辑），并将运行时令牌设置为 `CF_API_TOKEN` GitHub Secret，部署令牌在 Actions workflow 中单独配置。
 
 ### 部署流程
 

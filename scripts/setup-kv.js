@@ -18,23 +18,30 @@ const apiHeaders = {
 };
 
 async function findOrCreateKV() {
-  // List existing namespaces
   console.log(`Finding KV namespace "${KV_NAME}"...`);
-  const listRes = await fetch(
-    `${API}/accounts/${ACCOUNT_ID}/storage/kv/namespaces?per_page=100`,
-    { headers: apiHeaders }
-  );
-  const listData = await listRes.json();
 
-  if (!listData.success) {
-    console.error('Failed to list KV namespaces:', JSON.stringify(listData.errors));
-    process.exit(1);
-  }
+  // Paginate through namespaces (rarely needed but correct)
+  let page = 1;
+  while (true) {
+    const listRes = await fetch(
+      `${API}/accounts/${ACCOUNT_ID}/storage/kv/namespaces?per_page=50&page=${page}`,
+      { headers: apiHeaders }
+    );
+    const listData = await listRes.json();
 
-  const existing = listData.result.find(ns => ns.title === KV_NAME);
-  if (existing) {
-    console.log(`Found existing: ${existing.id}`);
-    return existing.id;
+    if (!listData.success) {
+      console.error('Failed to list KV namespaces:', JSON.stringify(listData.errors));
+      process.exit(1);
+    }
+
+    const existing = listData.result.find(ns => ns.title === KV_NAME);
+    if (existing) {
+      console.log(`Found existing: ${existing.id}`);
+      return existing.id;
+    }
+
+    if (listData.result.length < 50) break;
+    page++;
   }
 
   // Create new
@@ -58,16 +65,20 @@ async function findOrCreateKV() {
   return createData.result.id;
 }
 
-async function updateWranglerToml(kvId) {
+function updateWranglerToml(kvId) {
   let content = readFileSync(WRANGLER_PATH, 'utf8');
-  content = content.replace('PLACEHOLDER_KV_ID', kvId);
-  writeFileSync(WRANGLER_PATH, content);
-  console.log('Updated wrangler.toml with KV namespace ID');
+  // Only replace the id field under [[kv_namespaces]], not comments or other occurrences
+  content = content.replace(/^id\s*=\s*"PLACEHOLDER_KV_ID"/m, `id = "${kvId}"`);
+  // Only write if running in CI (don't dirty local working tree)
+  if (process.env.CI) {
+    writeFileSync(WRANGLER_PATH, content);
+  }
+  console.log('KV namespace ID:', kvId);
 }
 
 async function main() {
   const kvId = await findOrCreateKV();
-  await updateWranglerToml(kvId);
+  updateWranglerToml(kvId);
   console.log('KV setup complete.');
 }
 
