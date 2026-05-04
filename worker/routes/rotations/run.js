@@ -70,6 +70,7 @@ function getIPsFromServers(servers, rotation) {
 
 async function fetchKomariIPs(env, rotation) {
   const baseUrl = env.KOMARI_BASE_URL;
+  const apiToken = env.KOMARI_API_TOKEN;
   if (!baseUrl) return [];
 
   try {

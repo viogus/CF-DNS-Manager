@@ -91,7 +91,9 @@ const App = () => {
             } else if (!res.ok) {
                 showToast(`${t('fetchZonesFailed')} (${res.status})`, 'error');
             }
-        } catch (err) { }
+        } catch (err) {
+            console.error('Failed to fetch zones:', err);
+        }
         setLoading(false);
     };
 

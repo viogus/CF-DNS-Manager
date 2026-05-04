@@ -319,7 +319,9 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
             const res = await fetch(`/api/zones/${zone.id}/dns_records`, { headers: getHeaders() });
             const data = await res.json();
             setRecords((data.result || []).sort((a, b) => new Date(b.modified_on) - new Date(a.modified_on)));
-        } catch (e) { }
+        } catch (e) {
+            console.error('Failed to fetch DNS records:', e);
+        }
         setLoading(false);
     };
 
@@ -444,9 +446,6 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
             delete payload.content;
             if (payload.type === 'SRV' || payload.type === 'URI') {
                 delete payload.priority; // Priority is inside data for SRV/URI
-                if (payload.type === 'SRV' && payload.name) {
-                    payload.data = { ...payload.data, name: payload.name };
-                }
             }
         }
         // proxied is only valid for A, AAAA, CNAME

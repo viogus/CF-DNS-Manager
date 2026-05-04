@@ -144,4 +144,4 @@ npm run deploy
 等价于 `npm run build && wrangler deploy`，一条命令完成：Vite 构建 + Worker 部署 + 静态资源 + KV 绑定 + Cron 触发器。
 
 ---
-*由 [Antigravity](https://github.com/google-deepmind) 驱动开发*
+*由 [Claude](https://claude.ai) 驱动开发*

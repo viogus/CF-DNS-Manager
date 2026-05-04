@@ -1,12 +1,12 @@
 import { getRotation, putRotation, deleteRotation, listRotationsForZone } from './rotations/_kv';
 
-const CRON_RE = /^(\*|[0-9]+(?:-[0-9]+)?(?:\/[0-9]+)?|\*\/[0-9]+)(?:,(\*|[0-9]+(?:-[0-9]+)?(?:\/[0-9]+)?|\*\/[0-9]+))*\s+(\*|[0-9]+(?:-[0-9]+)?(?:\/[0-9]+)?|\*\/[0-9]+)(?:,(\*|[0-9]+(?:-[0-9]+)?(?:\/[0-9]+)?|\*\/[0-9]+))*\s+(\*|[0-9]+(?:-[0-9]+)?(?:\/[0-9]+)?|\*\/[0-9]+)(?:,(\*|[0-9]+(?:-[0-9]+)?(?:\/[0-9]+)?|\*\/[0-9]+))*\s+(\*|[0-9]+(?:-[0-9]+)?(?:\/[0-9]+)?|\*\/[0-9]+)(?:,(\*|[0-9]+(?:-[0-9]+)?(?:\/[0-9]+)?|\*\/[0-9]+))*\s+(\*|[0-9]+(?:-[0-9]+)?(?:\/[0-9]+)?|\*\/[0-9]+)(?:,(\*|[0-9]+(?:-[0-9]+)?(?:\/[0-9]+)?|\*\/[0-9]+))*$/;
+const CRON_FIELD_RE = /^[*0-9,\-\/]+$/;
 
 function isValidCron(expr) {
   if (typeof expr !== 'string' || !expr.trim()) return false;
   const parts = expr.trim().split(/\s+/);
   if (parts.length !== 5) return false;
-  return CRON_RE.test(expr.trim());
+  return parts.every(part => CRON_FIELD_RE.test(part));
 }
 
 export async function GET(request, env, params, data) {
