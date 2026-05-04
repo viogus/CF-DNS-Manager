@@ -4,7 +4,7 @@
  * 支持自动从主机名提取并匹配 DNSPod 域名
  */
 
-import { callDnspodApi, DNSPOD_VERSION } from './_tc3';
+import { callDnspodApi } from './_tc3';
 
 /**
  * 从主机名中提取可能的域名列表

@@ -1,7 +1,7 @@
 export async function GET(request, env, params, data) {
   const { cfToken } = data;
   const { zoneId } = params;
-  const response = await fetch(`https://api.cloudflare.com/client/v4/zones/${zoneId}/dns_records?per_page=50000`, {
+  const response = await fetch(`https://api.cloudflare.com/client/v4/zones/${zoneId}/dns_records?per_page=5000`, {
     headers: { 'Authorization': `Bearer ${cfToken}`, 'Content-Type': 'application/json' }
   });
   const responseData = await response.json();
