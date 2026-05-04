@@ -135,6 +135,7 @@ export async function PATCH(request, env, params, data) {
     }
     existing.cron = body.cron.trim();
   }
+  if (body.timezone !== undefined) existing.timezone = body.timezone;
   existing.updatedAt = new Date().toISOString();
 
   await putRotation(env, existing);

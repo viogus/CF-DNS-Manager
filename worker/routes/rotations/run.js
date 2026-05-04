@@ -171,7 +171,7 @@ function cronMatches(cronExpr, date, timezone) {
   const parts = cronExpr.trim().split(/\s+/);
   if (parts.length !== 5) return false;
   const [min, hour, day, month, weekday] = parts;
-  const local = getLocalParts(date, timezone || 'Asia/Shanghai');
+  const local = getLocalParts(date, timezone || 'UTC');
   return (
     matchField(min, local.minute) &&
     matchField(hour, local.hour) &&

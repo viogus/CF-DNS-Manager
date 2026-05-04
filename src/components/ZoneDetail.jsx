@@ -176,13 +176,12 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
         setRotationLoading(false);
     };
 
-    const describeCron = (expr) => {
+    const describeCron = (expr, timezone) => {
         if (!expr) return '';
         const parts = expr.trim().split(/\s+/);
         if (parts.length !== 5) return expr;
         const [min, hour, day, month, weekday] = parts;
 
-        // Build human-readable description
         let desc = '';
         if (min === '*' && hour === '*' && day === '*' && month === '*' && weekday === '*') {
             desc = t('cronEveryMinute');
@@ -197,8 +196,9 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
             const wd = parseInt(weekday);
             desc = t('cronWeeklyAt').replace('{day}', days[wd] || weekday).replace('{time}', hour.padStart(2, '0') + ':' + min.padStart(2, '0'));
         } else {
-            desc = expr; // fallback: show raw cron
+            desc = expr;
         }
+        if (timezone) desc += ` (${timezone})`;
         return desc;
     };
 
@@ -1272,6 +1272,7 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
                                                     <th>{t('type')}</th>
                                                     <th>{t('sourceType')}</th>
                                                     <th>{t('rotationCron')}</th>
+                                                    <th>{t('rotationTimezone')}</th>
                                                     <th>{t('lastRotated')}</th>
                                                     <th>{t('status')}</th>
                                                     <th>{t('actions')}</th>
@@ -1285,7 +1286,8 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
                                                         <td style={{ fontSize: '0.8125rem' }}>
                                                             {rot.ipSource === 'komari' ? t('rotationSourceKomari') : t('rotationSourceManual')}
                                                         </td>
-                                                        <td style={{ fontSize: '0.8125rem' }}>{describeCron(rot.cron)}</td>
+                                                        <td style={{ fontSize: '0.8125rem' }}>{describeCron(rot.cron, rot.timezone)}</td>
+                                                        <td style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{rot.timezone || 'UTC'}</td>
                                                         <td style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
                                                             {rot.lastRotatedAt ? new Date(rot.lastRotatedAt).toLocaleString() : t('never')}
                                                         </td>
@@ -1330,7 +1332,7 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
                                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                                     <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                                                         <div>{rot.ipSource === 'komari' ? t('rotationSourceKomari') : t('rotationSourceManual')}</div>
-                                                        <div>{describeCron(rot.cron)} {rot.lastRotatedAt ? '· ' + new Date(rot.lastRotatedAt).toLocaleDateString() : ''}</div>
+                                                        <div>{describeCron(rot.cron, rot.timezone)} {rot.lastRotatedAt ? '· ' + new Date(rot.lastRotatedAt).toLocaleDateString() : ''}</div>
                                                     </div>
                                                     <div style={{ display: 'flex', gap: '4px' }}>
                                                         <button className="btn btn-outline" style={{ padding: '0.35rem', border: 'none' }} onClick={() => editRotationStart(rot)}>
