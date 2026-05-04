@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Globe, Server, Plus, Trash2, Edit2, RefreshCw, Zap, CheckCircle, AlertCircle, X, Search, ChevronDown, Upload, Download, Copy } from 'lucide-react';
 import useKomari from '../hooks/useKomari.js';
 import CustomSelect from './CustomSelect.jsx';
@@ -295,22 +295,6 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
         setRotatingNow(false);
     };
 
-    // Auto-poll rotation when tab is active (fallback scheduler)
-    useEffect(() => {
-        if (tab !== 'rotation') return;
-        const interval = setInterval(() => {
-            fetch('/api/rotations/run', {
-                method: 'POST',
-                headers: getHeaders()
-            }).then(res => res.json()).then(data => {
-                if (data.success && data.rotated > 0) {
-                    fetchRotations();
-                }
-            }).catch(() => {});
-        }, 60000);
-        return () => clearInterval(interval);
-    }, [tab, zone.id]);
-
     const getHeaders = (withType = false) => getAuthHeaders(auth, withType);
 
     const fetchDNS = async () => {
@@ -342,28 +326,33 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
 
             // Auto-configure pending SSL validation records (server mode only)
             if (auth?.mode === 'server') {
+                const pendingVerifications = [];
                 for (const hostname of hostnames) {
                     const validationRecords = hostname.ssl?.validation_records || [];
                     for (const rec of validationRecords) {
                         if (rec.status === 'pending' && rec.txt_name && rec.txt_value) {
-                            try {
-                                const verifyRes = await fetch(`/api/zones/${zone.id}/auto_verify`, {
-                                    method: 'POST',
-                                    headers: getAuthHeaders(auth, true),
-                                    body: JSON.stringify({
-                                        hostname: hostname.hostname,
-                                        txt_name: rec.txt_name,
-                                        txt_value: rec.txt_value,
-                                        record_type: 'TXT'
-                                    })
-                                });
-                                const verifyData = await verifyRes.json();
-                                if (verifyData.success && verifyData.message !== 'Record already exists with same value') {
-                                    showToast(`${t('autoVerifySuccess')} (SSL: ${hostname.hostname})`);
-                                }
-                            } catch {
-                                // Silently ignore
-                            }
+                            pendingVerifications.push({ hostname: hostname.hostname, rec });
+                        }
+                    }
+                }
+                if (pendingVerifications.length > 0) {
+                    const results = await Promise.allSettled(
+                        pendingVerifications.map(({ hostname, rec }) =>
+                            fetch(`/api/zones/${zone.id}/auto_verify`, {
+                                method: 'POST',
+                                headers: getAuthHeaders(auth, true),
+                                body: JSON.stringify({
+                                    hostname,
+                                    txt_name: rec.txt_name,
+                                    txt_value: rec.txt_value,
+                                    record_type: 'TXT'
+                                })
+                            }).then(res => res.json())
+                        )
+                    );
+                    for (const result of results) {
+                        if (result.status === 'fulfilled' && result.value.success && result.value.message !== 'Record already exists with same value') {
+                            showToast(`${t('autoVerifySuccess')} (SSL)`);
                         }
                     }
                 }
@@ -747,15 +736,15 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
         });
     };
 
-    const filteredRecords = records.filter(r =>
+    const filteredRecords = useMemo(() => records.filter(r =>
         r.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         r.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
         r.type.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    ), [records, searchTerm]);
 
-    const filteredSaaS = hostnames.filter(h =>
+    const filteredSaaS = useMemo(() => hostnames.filter(h =>
         h.hostname.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    ), [hostnames, searchTerm]);
 
     return (
         <div className="container">
@@ -1433,7 +1422,7 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
                                         → {describeCron(newRotation.cron)}
                                     </div>
                                     <div style={{ marginTop: '8px', fontSize: '0.7rem', color: 'var(--text-muted)', lineHeight: 1.6 }}>
-                                        {t('cronFormat')}: 分 时 日 月 周<br/>
+                                        {t('cronFormat')}: {t('cronFieldLabels')}<br/>
                                         <code style={{ fontSize: '0.7rem', background: '#f8fafc', padding: '2px 4px', borderRadius: '3px' }}>*/5 * * * *</code> {t('cronExample1')}<br/>
                                         <code style={{ fontSize: '0.7rem', background: '#f8fafc', padding: '2px 4px', borderRadius: '3px' }}>0 */6 * * *</code> {t('cronExample2')}<br/>
                                         <code style={{ fontSize: '0.7rem', background: '#f8fafc', padding: '2px 4px', borderRadius: '3px' }}>0 3 * * *</code> {t('cronExample3')}<br/>

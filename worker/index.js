@@ -44,16 +44,24 @@ const routes = [
 ];
 
 const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET,POST,PATCH,PUT,DELETE,OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Cloudflare-Token,X-Rotation-Key,X-Managed-Account-Index',
 };
 
-function addCors(headers) {
+function corsHeaders(request) {
+  const origin = request.headers.get('Origin') || '*';
+  const h = new Headers(CORS_HEADERS);
+  h.set('Access-Control-Allow-Origin', origin);
+  return h;
+}
+
+function addCors(headers, request) {
   const h = new Headers(headers);
+  const origin = request.headers.get('Origin') || '*';
   for (const [k, v] of Object.entries(CORS_HEADERS)) {
     if (!h.has(k)) h.set(k, v);
   }
+  if (!h.has('Access-Control-Allow-Origin')) h.set('Access-Control-Allow-Origin', origin);
   return h;
 }
 
@@ -88,7 +96,7 @@ async function handleRequest(request, env) {
 
   // CORS preflight
   if (request.method === 'OPTIONS') {
-    return new Response(null, { status: 204, headers: CORS_HEADERS });
+    return new Response(null, { status: 204, headers: corsHeaders(request) });
   }
 
   // API routes
@@ -97,7 +105,7 @@ async function handleRequest(request, env) {
     if (!match) {
       return new Response(JSON.stringify({ error: 'Not Found' }), {
         status: 404,
-        headers: addCors({ 'Content-Type': 'application/json' })
+        headers: addCors({ 'Content-Type': 'application/json' }, request)
       });
     }
 
@@ -109,7 +117,7 @@ async function handleRequest(request, env) {
     if (authError) {
       return new Response(JSON.stringify(authError.body), {
         status: authError.status,
-        headers: addCors({ 'Content-Type': 'application/json' })
+        headers: addCors({ 'Content-Type': 'application/json' }, request)
       });
     }
 
@@ -119,7 +127,7 @@ async function handleRequest(request, env) {
     }
     return new Response(JSON.stringify({ error: 'Method Not Allowed' }), {
       status: 405,
-      headers: addCors({ 'Content-Type': 'application/json' })
+      headers: addCors({ 'Content-Type': 'application/json' }, request)
     });
   }
 

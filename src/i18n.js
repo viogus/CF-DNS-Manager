@@ -197,6 +197,7 @@ const translations = {
         rotationDisabled: '已停用',
         // Cron descriptions
         cronEveryMinute: '每分钟',
+        cronFieldLabels: '分 时 日 月 周',
         cronEveryNMinutes: '每 {n} 分钟',
         cronEveryNHours: '每 {n} 小时整点',
         cronDailyAt: '每天 {time}',
@@ -407,6 +408,7 @@ const translations = {
         rotationDisabled: 'Disabled',
         // Cron descriptions
         cronEveryMinute: 'Every minute',
+        cronFieldLabels: 'min hour day month weekday',
         cronEveryNMinutes: 'Every {n} minutes',
         cronEveryNHours: 'Every {n} hours',
         cronDailyAt: 'Daily at {time}',
