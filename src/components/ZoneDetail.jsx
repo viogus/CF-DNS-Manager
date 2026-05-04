@@ -4,6 +4,28 @@ import useKomari from '../hooks/useKomari.js';
 import CustomSelect from './CustomSelect.jsx';
 import { getAuthHeaders } from '../utils.js';
 
+const TIMEZONES = [
+    'Asia/Shanghai',
+    'Asia/Tokyo',
+    'Asia/Seoul',
+    'Asia/Singapore',
+    'Asia/Kolkata',
+    'Asia/Dubai',
+    'Europe/London',
+    'Europe/Paris',
+    'Europe/Berlin',
+    'Europe/Moscow',
+    'America/New_York',
+    'America/Chicago',
+    'America/Denver',
+    'America/Los_Angeles',
+    'America/Sao_Paulo',
+    'Pacific/Auckland',
+    'Pacific/Honolulu',
+    'Australia/Sydney',
+    'UTC'
+];
+
 const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, auth, onBack, t, showToast, tab, setTab }) => {
     const [records, setRecords] = useState([]);
     const [hostnames, setHostnames] = useState([]);
@@ -137,6 +159,7 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
         manualIPs: '',
         komariServerFilter: [],
         cron: '0 3 * * *',
+        timezone: 'Asia/Shanghai',
         enabled: true
     };
     const [newRotation, setNewRotation] = useState(defaultRotation);
@@ -229,6 +252,7 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
             manualIPs: (rot.manualIPs || []).join('\n'),
             komariServerFilter: [...(rot.komariServerFilter || [])],
             cron: rot.cron || '0 3 * * *',
+            timezone: rot.timezone || 'Asia/Shanghai',
             enabled: rot.enabled
         });
         setShowRotationModal(true);
@@ -249,6 +273,7 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
                 manualIPs: newRotation.ipSource === 'manual' ? newRotation.manualIPs.split('\n').map(s => s.trim()).filter(Boolean) : [],
                 komariServerFilter: newRotation.ipSource === 'komari' ? newRotation.komariServerFilter : [],
                 cron: newRotation.cron,
+                timezone: newRotation.timezone,
                 enabled: newRotation.enabled,
                 zoneName: zone.name
             };
@@ -1429,6 +1454,18 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
                                         <code style={{ fontSize: '0.7rem', background: '#f8fafc', padding: '2px 4px', borderRadius: '3px' }}>0 9 * * 1-5</code> {t('cronExample4')}
                                     </div>
                                 </div>
+                            </div>
+                            <div className="input-row">
+                                <label>{t('rotationTimezone')}</label>
+                                <select
+                                    value={newRotation.timezone}
+                                    onChange={(e) => setNewRotation({ ...newRotation, timezone: e.target.value })}
+                                    style={{ flex: 1, padding: '0.625rem 0.875rem', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '0.875rem', background: 'var(--bg)', color: 'var(--text)' }}
+                                >
+                                    {TIMEZONES.map(tz => (
+                                        <option key={tz} value={tz}>{tz}</option>
+                                    ))}
+                                </select>
                             </div>
                             <div className="input-row" style={{ alignItems: 'center' }}>
                                 <label>{t('status')}</label>

@@ -128,17 +128,56 @@ function matchField(field, value) {
   return parseInt(field) === value;
 }
 
+/** Check whether a 5-field cron expression matches a given Date in a specific timezone */
+function getLocalParts(date, timezone) {
+  try {
+    const parts = Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      minute: 'numeric',
+      hour: 'numeric',
+      day: 'numeric',
+      month: 'numeric',
+      weekday: 'short',
+      hour12: false
+    }).formatToParts(date);
+
+    const vals = {};
+    for (const p of parts) {
+      if (p.type === 'minute') vals.minute = parseInt(p.value);
+      if (p.type === 'hour') vals.hour = parseInt(p.value);
+      if (p.type === 'day') vals.day = parseInt(p.value);
+      if (p.type === 'month') vals.month = parseInt(p.value);
+      if (p.type === 'weekday') vals.weekday = p.value; // 'Mon','Tue',etc
+    }
+
+    const weekdays = { mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6, sun: 7 };
+    vals.weekday = weekdays[vals.weekday?.toLowerCase()] || 1;
+
+    return vals;
+  } catch {
+    // Invalid timezone — fall back to UTC
+    return {
+      minute: date.getUTCMinutes(),
+      hour: date.getUTCHours(),
+      day: date.getUTCDate(),
+      month: date.getUTCMonth() + 1,
+      weekday: date.getUTCDay() === 0 ? 7 : date.getUTCDay()
+    };
+  }
+}
+
 /** Check whether a 5-field cron expression matches a given Date */
-function cronMatches(cronExpr, date) {
+function cronMatches(cronExpr, date, timezone) {
   const parts = cronExpr.trim().split(/\s+/);
   if (parts.length !== 5) return false;
   const [min, hour, day, month, weekday] = parts;
+  const local = getLocalParts(date, timezone || 'Asia/Shanghai');
   return (
-    matchField(min, date.getUTCMinutes()) &&
-    matchField(hour, date.getUTCHours()) &&
-    matchField(day, date.getUTCDate()) &&
-    matchField(month, date.getUTCMonth() + 1) &&
-    matchField(weekday, date.getUTCDay() === 0 ? 7 : date.getUTCDay()) // Sun=7 in cron
+    matchField(min, local.minute) &&
+    matchField(hour, local.hour) &&
+    matchField(day, local.day) &&
+    matchField(month, local.month) &&
+    matchField(weekday, local.weekday)
   );
 }
 
@@ -160,7 +199,7 @@ export async function runRotations(env) {
     if (!rotation.enabled) continue;
     const lastMinute = rotation.lastRotatedAt ? rotation.lastRotatedAt.slice(0, 16) : '';
     if (lastMinute === thisMinute) continue;
-    if (!rotation.cron || !cronMatches(rotation.cron, now)) continue;
+    if (!rotation.cron || !cronMatches(rotation.cron, now, rotation.timezone || 'Asia/Shanghai')) continue;
 
     try {
       let ipPool;

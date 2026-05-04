@@ -89,6 +89,7 @@ export async function POST(request, env, params, data) {
     manualIPs: body.ipSource === 'manual' ? (body.manualIPs || []) : [],
     komariServerFilter: body.komariServerFilter || [],
     cron: body.cron.trim(),
+    timezone: body.timezone || 'Asia/Shanghai',
     enabled: body.enabled !== false,
     currentIndex: (existing && !ipSourceChanged) ? existing.currentIndex : 0,
     lastRotatedAt: (existing && !ipSourceChanged) ? existing.lastRotatedAt : null,
