@@ -330,7 +330,8 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
             const res = await fetch(`/api/zones/${zone.id}/custom_hostnames`, { headers: getHeaders() });
             if (!res.ok) {
                 const errorData = await res.json();
-                const msg = errorData.errors?.[0]?.message || errorData.error || 'Failed to fetch custom hostnames';
+                const firstErr = errorData.errors?.[0];
+                const msg = typeof firstErr === 'string' ? firstErr : firstErr?.message || errorData.error || errorData.errors?.join(', ') || 'Failed to fetch custom hostnames';
                 throw new Error(msg);
             }
             const data = await res.json();

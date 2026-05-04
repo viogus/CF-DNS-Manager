@@ -25,7 +25,7 @@ export async function POST(request, env, params, data) {
       .sign(secret);
 
     const accounts = [];
-    if (env.CF_API_TOKEN) accounts.push({ id: 0, name: 'Default Account' });
+    if (env.CF_API_TOKEN || env.CF_API_DNS_TOKEN) accounts.push({ id: 0, name: 'Default Account' });
     let i = 1;
     while (env[`CF_API_TOKEN${i}`]) {
       accounts.push({ id: i, name: `Account ${i}` });

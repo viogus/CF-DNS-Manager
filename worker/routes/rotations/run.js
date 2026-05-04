@@ -146,7 +146,7 @@ export async function runRotations(env) {
   const results = [];
   const now = new Date();
   const thisMinute = now.toISOString().slice(0, 16);
-  const cfToken = env.CF_API_TOKEN;
+  const cfToken = env.CF_API_DNS_TOKEN || env.CF_API_TOKEN;
 
   // Fetch Komari IPs once before the loop (shared across all rotations using komari)
   let komariServers = null;
@@ -192,7 +192,8 @@ export async function runRotations(env) {
         await putRotation(env, rotation);
         results.push({ recordId: rotation.recordId, recordName: rotation.recordName, status: 'rotated', newIP, nextIndex: rotation.currentIndex });
       } else {
-        results.push({ recordId: rotation.recordId, status: 'failed', error: patchData.errors?.[0]?.message || 'Unknown error' });
+        const err = patchData.errors?.[0];
+        results.push({ recordId: rotation.recordId, status: 'failed', error: typeof err === 'string' ? err : err?.message || 'Unknown error' });
       }
     } catch (e) {
       results.push({ recordId: rotation.recordId, status: 'error', error: e.message });

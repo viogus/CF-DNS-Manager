@@ -23,7 +23,7 @@ export async function authenticate(request, env, url) {
     if (!url.pathname.startsWith('/api/rotations/')) {
       return { error: { status: 403, body: { error: 'Rotation key not allowed for this endpoint' } } };
     }
-    data.cfToken = env.CF_API_TOKEN;
+    data.cfToken = env.CF_API_DNS_TOKEN || env.CF_API_TOKEN;
     data.komariBaseUrl = env.KOMARI_BASE_URL;
     data.komariApiToken = env.KOMARI_API_TOKEN;
     return { data };
