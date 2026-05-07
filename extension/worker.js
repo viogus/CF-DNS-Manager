@@ -37,7 +37,12 @@ async function execOnAgent(token, uuid, cmd, args) {
             if (qRes && qRes.result && qRes.result.length > 0) {
                 var task = qRes.result[0];
                 if (task.success === true && task.task_event_result) {
-                    return String(task.task_event_result).trim();
+                    // task_event_result 是对象 {execute: "output\n"}
+                    var out = task.task_event_result;
+                    if (typeof out === 'object' && out !== null) {
+                        return String(out.execute || Object.values(out)[0] || '').trim();
+                    }
+                    return String(out).trim();
                 }
                 if (task.success === false) return '';
             }
@@ -59,7 +64,6 @@ export default {
         if (path[path.length - 1] === '/') path = path.substring(0, path.length - 1);
         var method = request.method.toUpperCase();
 
-        // 匹配以 /api/servers 结尾的 GET 请求
         if (path.indexOf('/api/servers') === path.length - '/api/servers'.length && method === 'GET') {
             var auth = '';
             try { auth = request.headers.get('Authorization') || ''; } catch (e) {}
@@ -85,23 +89,18 @@ export default {
                     try {
                         var name = uuid.substring(0, 8);
 
-                        // 获取 hostname（从 static monitoring）
-                        try {
-                            var monRes = await globalThis.nodeget('nodeget-server_list_all_agent_uuid', { token: token || env.token });
-                        } catch (e) {}
-
                         // 并行获取 IPv4 和 IPv6
-                        var v4Result = await execOnAgent(token || env.token, uuid, 'curl', ['-s', 'ip.sb']);
-                        var v6Result = await execOnAgent(token || env.token, uuid, 'curl', ['-6', '-s', 'ip.sb']);
+                        var v4 = await execOnAgent(token || env.token, uuid, 'curl', ['-s', 'ip.sb']);
+                        var v6 = await execOnAgent(token || env.token, uuid, 'curl', ['-6', '-s', 'ip.sb']);
 
                         var ipv4 = [];
                         var ipv6 = [];
 
-                        v4Result = (v4Result || '').replace(/[^0-9.]/g, '');
-                        if (v4Result && isIPv4(v4Result)) ipv4.push(v4Result);
+                        v4 = (v4 || '').replace(/[^0-9.]/g, '');
+                        if (v4 && isIPv4(v4)) ipv4.push(v4);
 
-                        v6Result = (v6Result || '').replace(/[^0-9a-fA-F:]/g, '');
-                        if (v6Result && isIPv6(v6Result)) ipv6.push(v6Result);
+                        v6 = (v6 || '').replace(/[^0-9a-fA-F:]/g, '');
+                        if (v6 && isIPv6(v6)) ipv6.push(v6);
 
                         if (ipv4.length || ipv6.length) {
                             servers.push({ name: name, ipv4: ipv4, ipv6: ipv6 });
