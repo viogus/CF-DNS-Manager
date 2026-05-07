@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { Globe, Server, Plus, Trash2, Edit2, RefreshCw, Zap, CheckCircle, AlertCircle, X, Search, ChevronDown, Upload, Download, Copy } from 'lucide-react';
 import useKomari from '../hooks/useKomari.js';
+import useNodeget from '../hooks/useNodeget.js';
 import CustomSelect from './CustomSelect.jsx';
 import { getAuthHeaders } from '../utils.js';
 
@@ -34,7 +35,8 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
     const [error, setError] = useState(null);
 
     // Komari 集成
-    const { komariEnabled, ipToNameMap, getOptions: getKomariOptions, servers } = useKomari(auth);
+    const { komariEnabled, ipToNameMap: komariIpToNameMap, getOptions: getKomariOptions, servers: komariServers } = useKomari(auth);
+    const { nodegetEnabled, ipToNameMap: nodegetIpToNameMap, getOptions: getNodegetOptions, servers: nodegetServers } = useNodeget(auth);
     const [expandedRecords, setExpandedRecords] = useState(new Set());
     const [showVerifyModal, setShowVerifyModal] = useState(false);
     const [verifyingSaaS, setVerifyingSaaS] = useState(null);
@@ -158,6 +160,7 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
         ipSource: 'komari',
         manualIPs: '',
         komariServerFilter: [],
+        nodegetServerFilter: [],
         cron: '0 3 * * *',
         timezone: 'Asia/Shanghai',
         enabled: true
@@ -251,6 +254,7 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
             ipSource: rot.ipSource,
             manualIPs: (rot.manualIPs || []).join('\n'),
             komariServerFilter: [...(rot.komariServerFilter || [])],
+            nodegetServerFilter: [...(rot.nodegetServerFilter || [])],
             cron: rot.cron || '0 3 * * *',
             timezone: rot.timezone || 'Asia/Shanghai',
             enabled: rot.enabled
@@ -272,6 +276,7 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
                 ipSource: newRotation.ipSource,
                 manualIPs: newRotation.ipSource === 'manual' ? newRotation.manualIPs.split('\n').map(s => s.trim()).filter(Boolean) : [],
                 komariServerFilter: newRotation.ipSource === 'komari' ? newRotation.komariServerFilter : [],
+                nodegetServerFilter: newRotation.ipSource === 'nodeget' ? newRotation.nodegetServerFilter : [],
                 cron: newRotation.cron,
                 timezone: newRotation.timezone,
                 enabled: newRotation.enabled,
@@ -1009,9 +1014,9 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
                                             </td>
                                             <td className="truncate-mobile" style={{ color: 'var(--text-muted)', fontSize: '0.8125rem' }}>
                                                 {record.content}
-                                                {komariEnabled && ipToNameMap.has(record.content) && (
+                                                {((komariEnabled && komariIpToNameMap.has(record.content)) || (nodegetEnabled && nodegetIpToNameMap.has(record.content))) && (
                                                     <span style={{ marginLeft: '6px', padding: '1px 6px', borderRadius: '10px', background: '#f0f0ff', color: '#6366f1', fontSize: '0.6875rem', border: '1px solid #c7d2fe', whiteSpace: 'nowrap' }}>
-                                                        {ipToNameMap.get(record.content).join(', ')}
+                                                        {[...(komariIpToNameMap.get(record.content) || []), ...(nodegetIpToNameMap.get(record.content) || [])].join(', ')}
                                                     </span>
                                                 )}
                                             </td>
@@ -1284,7 +1289,7 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
                                                         <td style={{ fontWeight: 600 }}>{rot.recordName}</td>
                                                         <td><span className="badge badge-blue">{rot.recordType}</span></td>
                                                         <td style={{ fontSize: '0.8125rem' }}>
-                                                            {rot.ipSource === 'komari' ? t('rotationSourceKomari') : t('rotationSourceManual')}
+                                                            {rot.ipSource === 'komari' ? t('rotationSourceKomari') : rot.ipSource === 'nodeget' ? t('rotationSourceNodeget') : t('rotationSourceManual')}
                                                         </td>
                                                         <td style={{ fontSize: '0.8125rem' }}>{describeCron(rot.cron, rot.timezone)}</td>
                                                         <td style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{rot.timezone || 'UTC'}</td>
@@ -1331,7 +1336,7 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
                                                 </div>
                                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                                     <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                                                        <div>{rot.ipSource === 'komari' ? t('rotationSourceKomari') : t('rotationSourceManual')}</div>
+                                                        <div>{rot.ipSource === 'komari' ? t('rotationSourceKomari') : rot.ipSource === 'nodeget' ? t('rotationSourceNodeget') : t('rotationSourceManual')}</div>
                                                         <div>{describeCron(rot.cron, rot.timezone)} {rot.lastRotatedAt ? '· ' + new Date(rot.lastRotatedAt).toLocaleDateString() : ''}</div>
                                                     </div>
                                                     <div style={{ display: 'flex', gap: '4px' }}>
@@ -1391,6 +1396,7 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
                                         onChange={(e) => setNewRotation({ ...newRotation, ipSource: e.target.value })}
                                         options={[
                                             ...(komariEnabled ? [{ value: 'komari', label: t('rotationSourceKomari') }] : []),
+                                            ...(nodegetEnabled ? [{ value: 'nodeget', label: t('rotationSourceNodeget') }] : []),
                                             { value: 'manual', label: t('rotationSourceManual') }
                                         ]}
                                     />
@@ -1400,7 +1406,7 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
                                 <div className="input-row">
                                     <label>{t('komariServers')}</label>
                                     <div style={{ flex: 1, display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                                        {servers.map(s => (
+                                        {komariServers.map(s => (
                                             <label key={s.name} style={{ fontSize: '0.8125rem', display: 'flex', alignItems: 'center', gap: '4px', padding: '2px 6px', background: newRotation.komariServerFilter.includes(s.name) ? '#fff7ed' : '#f9fafb', borderRadius: '6px', cursor: 'pointer', border: '1px solid var(--border)' }}>
                                                 <input
                                                     type="checkbox"
@@ -1417,7 +1423,32 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
                                                 {s.name}
                                             </label>
                                         ))}
-                                        {servers.length === 0 && <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>...</span>}
+                                        {komariServers.length === 0 && <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>...</span>}
+                                    </div>
+                                </div>
+                            )}
+                            {newRotation.ipSource === 'nodeget' && (
+                                <div className="input-row">
+                                    <label>{t('nodegetServers')}</label>
+                                    <div style={{ flex: 1, display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                                        {nodegetServers.map(s => (
+                                            <label key={s.name} style={{ fontSize: '0.8125rem', display: 'flex', alignItems: 'center', gap: '4px', padding: '2px 6px', background: newRotation.nodegetServerFilter.includes(s.name) ? '#fff7ed' : '#f9fafb', borderRadius: '6px', cursor: 'pointer', border: '1px solid var(--border)' }}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={newRotation.nodegetServerFilter.includes(s.name)}
+                                                    onChange={(e) => {
+                                                        if (e.target.checked) {
+                                                            setNewRotation({ ...newRotation, nodegetServerFilter: [...newRotation.nodegetServerFilter, s.name] });
+                                                        } else {
+                                                            setNewRotation({ ...newRotation, nodegetServerFilter: newRotation.nodegetServerFilter.filter(n => n !== s.name) });
+                                                        }
+                                                    }}
+                                                    style={{ width: '14px', height: '14px' }}
+                                                />
+                                                {s.name}
+                                            </label>
+                                        ))}
+                                        {nodegetServers.length === 0 && <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>...</span>}
                                     </div>
                                 </div>
                             )}
@@ -1538,6 +1569,22 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
                                                 onChange={(e) => setNewRecord({ ...newRecord, content: e.target.value })}
                                                 options={[{ value: '', label: t('komariSelectPlaceholder') }, ...opts]}
                                                 placeholder={t('komariSelectPlaceholder')}
+                                            />
+                                        </div>
+                                    </div>
+                                ) : null;
+                            })()}
+                            {nodegetEnabled && ['A', 'AAAA'].includes(newRecord.type) && (() => {
+                                const opts = getNodegetOptions(newRecord.type);
+                                return opts.length > 0 ? (
+                                    <div className="input-row">
+                                        <label>{t('nodegetServer')}</label>
+                                        <div style={{ flex: 1 }}>
+                                            <CustomSelect
+                                                value={newRecord.content}
+                                                onChange={(e) => setNewRecord({ ...newRecord, content: e.target.value })}
+                                                options={[{ value: '', label: t('nodegetSelectPlaceholder') }, ...opts]}
+                                                placeholder={t('nodegetSelectPlaceholder')}
                                             />
                                         </div>
                                     </div>
