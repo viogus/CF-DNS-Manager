@@ -35,24 +35,27 @@ async function createTask(token, uuid, cmd, args) {
 async function batchQueryTasks(token, taskRefs) {
     var resultMap = {};
     if (taskRefs.length === 0) return resultMap;
-    for (var i = 0; i < taskRefs.length; i++) {
-        try {
-            var q = await globalThis.nodeget('task_query', {
-                token: token,
-                task_data_query: { condition: [{ task_id: taskRefs[i].id }, { type: 'execute' }] }
-            });
-            if (q && q.result && q.result.length > 0) {
-                var t = q.result[0];
-                if (t.success === true || t.success === false) {
-                    var out = '';
-                    if (t.success && t.task_event_result) {
+    var allResults = await Promise.all(taskRefs.map(function(ref) {
+        return (async function() {
+            try {
+                var q = await globalThis.nodeget('task_query', {
+                    token: token,
+                    task_data_query: { condition: [{ task_id: ref.id }, { type: 'execute' }] }
+                });
+                if (q && q.result && q.result.length > 0) {
+                    var t = q.result[0];
+                    if (t.success === true && t.task_event_result) {
                         var o = t.task_event_result;
-                        out = typeof o === 'object' && o ? String(o.execute || Object.values(o)[0] || '') : String(o);
+                        var out = typeof o === 'object' && o ? String(o.execute || Object.values(o)[0] || '') : String(o);
+                        return { id: ref.id, value: out.trim() };
                     }
-                    resultMap[taskRefs[i].id] = out.trim();
                 }
-            }
-        } catch (e) {}
+            } catch (e) {}
+            return null;
+        })();
+    }));
+    for (var i = 0; i < allResults.length; i++) {
+        if (allResults[i]) resultMap[allResults[i].id] = allResults[i].value;
     }
     return resultMap;
 }
