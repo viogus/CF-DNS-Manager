@@ -1,10 +1,6 @@
 // CF-DNS-Manager NodeGet Extension — worker.js
-// 运行在 NodeGet Server 的 QuickJS 运行时中
+// 部署方式：NodeGet Dashboard → JS Worker → 创建/更新脚本
 // 暴露 /api/servers 端点，返回 Komari 兼容格式的 agent IP 列表
-
-// ============================================================
-// 工具函数（与 CF-DNS-Manager 的 normalizeServers 保持一致）
-// ============================================================
 
 function isIPv4(ip) {
     return /^[0-9.]+$/.test(ip) && ip.includes('.');
@@ -14,134 +10,60 @@ function isIPv6(ip) {
     return /:/.test(ip);
 }
 
-// ============================================================
-// IP 获取
-// ============================================================
-
-// 从 agent UUID 列表和 server token 获取每个 agent 的 IP
-// 策略：查询 static_monitoring 最新数据中的 system_host_name，
-// 同时尝试通过 agent 连接元数据获取 IP
-async function fetchAgentIPs(uuids, token) {
-    const servers = [];
-
-    for (const uuid of uuids) {
-        try {
-            // 方案1：查询最新的 static monitoring 数据获取 hostname
-            const staticData = await globalThis.nodeget('monitoring.query_static', {
-                token: token,
-                query: {
-                    condition: [
-                        { uuid: uuid },
-                        { limit: 1 }
-                    ],
-                    fields: ['system']
-                }
-            });
-
-            // 方案2：获取 agent 的公网 IP（通过 task 触发 agent 的 ip_provider）
-            const ipResult = await globalThis.nodeget('task.create', {
-                token: token,
-                target_uuid: uuid,
-                task_type: { get_ip: {} }
-            });
-
-            // 轮询 task 结果
-            let ipData = null;
-            if (ipResult && ipResult.id) {
-                for (let i = 0; i < 15; i++) {
-                    await sleep(200);
-                    const queryResult = await globalThis.nodeget('task.query', {
-                        token: token,
-                        task_data_query: {
-                            condition: [
-                                { task_id: ipResult.id },
-                                { type: 'get_ip' }
-                            ]
-                        }
-                    });
-                    if (queryResult && queryResult.length > 0) {
-                        const task = queryResult[0];
-                        if (task.status === 'success' || task.status === 'failed') {
-                            if (task.result) {
-                                ipData = task.result;
-                            }
-                            break;
-                        }
-                    }
-                }
-            }
-
-            // 提取 IP
-            const ipv4 = [];
-            const ipv6 = [];
-
-            if (ipData) {
-                const ip = ipData.ip || ipData.ipv4 || ipData.public_ip || '';
-                if (ip) {
-                    if (isIPv4(ip)) ipv4.push(ip);
-                    else if (isIPv6(ip)) ipv6.push(ip);
-                }
-            }
-
-            // 从 static monitoring 获取 hostname 作为 server name
-            let name = uuid.substring(0, 8);
-            if (staticData && staticData.length > 0 && staticData[0].system) {
-                name = staticData[0].system.system_host_name || name;
-            }
-
-            if (ipv4.length || ipv6.length) {
-                servers.push({ name, ipv4, ipv6 });
-            }
-        } catch (e) {
-            // 单个 agent 失败不影响整体，继续下一个
-            console.error('Failed to get IP for agent ' + uuid + ': ' + (e.message || e));
-        }
-    }
-
-    return servers;
-}
-
 function sleep(ms) {
-    return new Promise(function(resolve) {
-        // QuickJS 兼容的 setTimeout
-        setTimeout(resolve, ms);
-    });
+    return new Promise(function(resolve) { setTimeout(resolve, ms); });
 }
 
-// ============================================================
-// HTTP 路由
-// ============================================================
+// 在目标 agent 上执行命令并获取输出
+async function execOnAgent(token, uuid, cmd, args) {
+    var createRes = await globalThis.nodeget('task_create_task', {
+        token: token,
+        target_uuid: uuid,
+        task_type: { execute: { cmd: cmd, args: args } }
+    });
+    var taskId = (createRes && createRes.result && createRes.result.id)
+        ? createRes.result.id : null;
+    if (!taskId) return '';
+
+    for (var j = 0; j < 30; j++) {
+        await sleep(500);
+        try {
+            var qRes = await globalThis.nodeget('task_query', {
+                token: token,
+                task_data_query: {
+                    condition: [{ task_id: taskId }, { type: 'execute' }]
+                }
+            });
+            if (qRes && qRes.result && qRes.result.length > 0) {
+                var task = qRes.result[0];
+                if (task.success === true && task.task_event_result) {
+                    return String(task.task_event_result).trim();
+                }
+                if (task.success === false) return '';
+            }
+        } catch (e) {}
+    }
+    return '';
+}
 
 export default {
     async onRoute(request, env, runtimeCtx) {
-        // QuickJS 中 request.url 可能是相对路径，不能用 new URL()
-        var path = request.url || '';
-        // 去掉 query string
-        var qIdx = path.indexOf('?');
-        if (qIdx >= 0) path = path.substring(0, qIdx);
-        // 去掉末尾斜杠
-        if (path.length > 1 && path[path.length - 1] === '/') {
-            path = path.substring(0, path.length - 1);
+        var urlStr = request.url || '';
+        var path = '';
+        try {
+            path = new URL(urlStr).pathname;
+        } catch (e) {
+            var idx = urlStr.indexOf('/', 8);
+            path = idx >= 0 ? urlStr.substring(idx) : urlStr;
         }
-        var method = typeof request.method === 'string'
-            ? request.method.toUpperCase()
-            : 'GET';
+        if (path[path.length - 1] === '/') path = path.substring(0, path.length - 1);
+        var method = request.method.toUpperCase();
 
-        // GET /api/servers — 返回 agent IP 列表
-        if (path === '/api/servers' && method === 'GET') {
-            // Token 校验
-            var authHeader = null;
-            var headers = request.headers || [];
-            for (var i = 0; i < headers.length; i++) {
-                var h = headers[i];
-                // headers 可能是 [name, value] 数组或 {name, value} 对象
-                var key = h[0] || h.name || '';
-                if (key.toLowerCase() === 'authorization') {
-                    authHeader = h[1] || h.value || '';
-                    break;
-                }
-            }
-            var token = authHeader ? authHeader.replace('Bearer ', '') : '';
+        // 匹配以 /api/servers 结尾的 GET 请求
+        if (path.indexOf('/api/servers') === path.length - '/api/servers'.length && method === 'GET') {
+            var auth = '';
+            try { auth = request.headers.get('Authorization') || ''; } catch (e) {}
+            var token = auth.replace('Bearer ', '');
 
             if (env.token && token !== env.token) {
                 return new Response(JSON.stringify({ error: 'Unauthorized' }), {
@@ -151,29 +73,48 @@ export default {
             }
 
             try {
-                // 获取所有 agent UUID
-                var uuidResult = await globalThis.nodeget('nodeget-server_list_all_agent_uuid', {
+                var rpc = await globalThis.nodeget('nodeget-server_list_all_agent_uuid', {
                     token: token || env.token
                 });
+                var uuids = (rpc && rpc.result && rpc.result.uuids)
+                    ? rpc.result.uuids : [];
+                var servers = [];
 
-                var uuids = (uuidResult && uuidResult.uuids) ? uuidResult.uuids :
-                    (Array.isArray(uuidResult) ? uuidResult : []);
+                for (var i = 0; i < uuids.length; i++) {
+                    var uuid = uuids[i];
+                    try {
+                        var name = uuid.substring(0, 8);
 
-                if (!uuids || uuids.length === 0) {
-                    return new Response(JSON.stringify([]), {
-                        headers: { 'Content-Type': 'application/json' }
-                    });
+                        // 获取 hostname（从 static monitoring）
+                        try {
+                            var monRes = await globalThis.nodeget('nodeget-server_list_all_agent_uuid', { token: token || env.token });
+                        } catch (e) {}
+
+                        // 并行获取 IPv4 和 IPv6
+                        var v4Result = await execOnAgent(token || env.token, uuid, 'curl', ['-s', 'ip.sb']);
+                        var v6Result = await execOnAgent(token || env.token, uuid, 'curl', ['-6', '-s', 'ip.sb']);
+
+                        var ipv4 = [];
+                        var ipv6 = [];
+
+                        v4Result = (v4Result || '').replace(/[^0-9.]/g, '');
+                        if (v4Result && isIPv4(v4Result)) ipv4.push(v4Result);
+
+                        v6Result = (v6Result || '').replace(/[^0-9a-fA-F:]/g, '');
+                        if (v6Result && isIPv6(v6Result)) ipv6.push(v6Result);
+
+                        if (ipv4.length || ipv6.length) {
+                            servers.push({ name: name, ipv4: ipv4, ipv6: ipv6 });
+                        }
+                    } catch (e) {}
                 }
-
-                // 获取每个 agent 的 IP
-                var servers = await fetchAgentIPs(uuids, token || env.token);
 
                 return new Response(JSON.stringify(servers), {
                     headers: { 'Content-Type': 'application/json' }
                 });
             } catch (e) {
                 return new Response(JSON.stringify({
-                    error: 'Failed to fetch agent IPs: ' + (e.message || e)
+                    error: 'Failed: ' + (e.message || e)
                 }), {
                     status: 500,
                     headers: { 'Content-Type': 'application/json' }
