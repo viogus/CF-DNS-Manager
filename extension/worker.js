@@ -114,16 +114,34 @@ function sleep(ms) {
 
 export default {
     async onRoute(request, env, runtimeCtx) {
-        const url = new URL(request.url);
-        const method = request.method.toUpperCase();
+        // QuickJS 中 request.url 可能是相对路径，不能用 new URL()
+        var path = request.url || '';
+        // 去掉 query string
+        var qIdx = path.indexOf('?');
+        if (qIdx >= 0) path = path.substring(0, qIdx);
+        // 去掉末尾斜杠
+        if (path.length > 1 && path[path.length - 1] === '/') {
+            path = path.substring(0, path.length - 1);
+        }
+        var method = typeof request.method === 'string'
+            ? request.method.toUpperCase()
+            : 'GET';
 
         // GET /api/servers — 返回 agent IP 列表
-        if (url.pathname === '/api/servers' && method === 'GET') {
+        if (path === '/api/servers' && method === 'GET') {
             // Token 校验
-            const authHeader = request.headers.find(function(h) {
-                return h[0].toLowerCase() === 'authorization';
-            });
-            const token = authHeader ? authHeader[1].replace('Bearer ', '') : '';
+            var authHeader = null;
+            var headers = request.headers || [];
+            for (var i = 0; i < headers.length; i++) {
+                var h = headers[i];
+                // headers 可能是 [name, value] 数组或 {name, value} 对象
+                var key = h[0] || h.name || '';
+                if (key.toLowerCase() === 'authorization') {
+                    authHeader = h[1] || h.value || '';
+                    break;
+                }
+            }
+            var token = authHeader ? authHeader.replace('Bearer ', '') : '';
 
             if (env.token && token !== env.token) {
                 return new Response(JSON.stringify({ error: 'Unauthorized' }), {
@@ -134,11 +152,11 @@ export default {
 
             try {
                 // 获取所有 agent UUID
-                const uuidResult = await globalThis.nodeget('nodeget-server_list_all_agent_uuid', {
+                var uuidResult = await globalThis.nodeget('nodeget-server_list_all_agent_uuid', {
                     token: token || env.token
                 });
 
-                const uuids = uuidResult && uuidResult.uuids ? uuidResult.uuids :
+                var uuids = (uuidResult && uuidResult.uuids) ? uuidResult.uuids :
                     (Array.isArray(uuidResult) ? uuidResult : []);
 
                 if (!uuids || uuids.length === 0) {
@@ -148,7 +166,7 @@ export default {
                 }
 
                 // 获取每个 agent 的 IP
-                const servers = await fetchAgentIPs(uuids, token || env.token);
+                var servers = await fetchAgentIPs(uuids, token || env.token);
 
                 return new Response(JSON.stringify(servers), {
                     headers: { 'Content-Type': 'application/json' }
