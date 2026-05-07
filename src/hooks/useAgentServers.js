@@ -6,14 +6,16 @@ function useAgentServers(auth, endpoint, name) {
     const [servers, setServers] = useState([]);
     const [enabled, setEnabled] = useState(false);
     const [loading, setLoading] = useState(false);
-    const cacheRef = useRef({ ts: 0, servers: [], enabled: false });
+    const cacheRef = useRef({ ts: 0, servers: [], enabled: false, account: undefined });
 
     const fetchServers = async () => {
         if (auth?.mode !== 'server') {
             setEnabled(false);
             return;
         }
-        if (Date.now() - cacheRef.current.ts < CACHE_TTL && cacheRef.current.ts > 0) {
+        var account = auth?.currentAccountIndex;
+        if (Date.now() - cacheRef.current.ts < CACHE_TTL && cacheRef.current.ts > 0
+            && cacheRef.current.account === account) {
             setServers(cacheRef.current.servers);
             setEnabled(cacheRef.current.enabled);
             return;
@@ -30,10 +32,10 @@ function useAgentServers(auth, endpoint, name) {
             if (data.enabled) {
                 setServers(data.servers || []);
                 setEnabled(true);
-                cacheRef.current = { ts: Date.now(), servers: data.servers || [], enabled: true };
+                cacheRef.current = { ts: Date.now(), servers: data.servers || [], enabled: true, account: account };
             } else {
                 setEnabled(false);
-                cacheRef.current = { ts: Date.now(), servers: [], enabled: false };
+                cacheRef.current = { ts: Date.now(), servers: [], enabled: false, account: account };
             }
         } catch {
             setEnabled(false);

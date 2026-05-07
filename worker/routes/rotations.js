@@ -146,10 +146,27 @@ export async function PATCH(request, env, params, data) {
     existing.currentIndex = 0;
   }
   if (body.manualIPs !== undefined) {
-    existing.manualIPs = Array.isArray(body.manualIPs) ? body.manualIPs : [];
+    if (!Array.isArray(body.manualIPs)) {
+      body.manualIPs = [];
+    }
+    const validIP = (ip) => /^[0-9.]+$/.test(ip) && ip.includes('.') || /:/.test(ip);
+    const invalid = body.manualIPs.find(ip => !validIP(ip));
+    if (invalid) {
+      return new Response(JSON.stringify({ success: false, error: `Invalid IP address: ${invalid}` }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+    existing.manualIPs = body.manualIPs;
     existing.currentIndex = 0;
   }
-  if (body.ipSource !== undefined && ['komari', 'manual', 'nodeget'].includes(body.ipSource)) {
+  if (body.ipSource !== undefined) {
+    if (!['komari', 'manual', 'nodeget'].includes(body.ipSource)) {
+      return new Response(JSON.stringify({ success: false, error: 'ipSource must be "komari", "manual", or "nodeget"' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
     if (body.ipSource !== existing.ipSource) existing.currentIndex = 0;
     existing.ipSource = body.ipSource;
   }
