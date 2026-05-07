@@ -26,6 +26,8 @@ export async function authenticate(request, env, url) {
     data.cfToken = env.CF_API_DNS_TOKEN || env.CF_API_TOKEN;
     data.komariBaseUrl = env.KOMARI_BASE_URL;
     data.komariApiToken = env.KOMARI_API_TOKEN;
+    data.nodegetBaseUrl = env.NODEGET_BASE_URL;
+    data.nodegetApiToken = env.NODEGET_API_TOKEN;
     return { data };
   }
 
@@ -59,6 +61,8 @@ export async function authenticate(request, env, url) {
       data.dnspodSecretKey = env.DNSPOD_SECRET_KEY;
       data.komariBaseUrl = env.KOMARI_BASE_URL;
       data.komariApiToken = env.KOMARI_API_TOKEN;
+      data.nodegetBaseUrl = env.NODEGET_BASE_URL;
+      data.nodegetApiToken = env.NODEGET_API_TOKEN;
       return { data };
     } catch (e) {
       return { error: { status: 401, body: { error: 'Invalid or expired session.', message: e.message } } };
