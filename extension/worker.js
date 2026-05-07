@@ -14,7 +14,7 @@ function sleep(ms) {
     return new Promise(function(resolve) { setTimeout(resolve, ms); });
 }
 
-async var ipv4Services = [
+var ipv4Services = [
     { cmd: 'curl', args: ['-4', '-s', 'ip.sb'] },
     { cmd: 'curl', args: ['-4', '-s', 'ifconfig.me'] },
     { cmd: 'curl', args: ['-4', '-s', 'api.ipify.org'] }
@@ -43,7 +43,7 @@ async function getAgentIP(token, uuid, ver) {
     return '';
 }
 
-function execOnAgent(token, uuid, cmd, args) {
+async function execOnAgent(token, uuid, cmd, args) {
     var createRes = await globalThis.nodeget('task_create_task', {
         token: token,
         target_uuid: uuid,
@@ -119,13 +119,15 @@ export default {
                 // 获取自定义名称：KV metadata_name → hostname → UUID 前缀
                 var nameMap = {};
 
+                var internalToken = env.super_token || token;
+
                 // 优先从 KV 拿自定义名称
                 try {
                     var nsKeys = uuids.map(function(u) {
                         return { namespace: u, key: 'metadata_name' };
                     });
                     var kvRes = await globalThis.nodeget('kv_get_multi_value', {
-                        token: token || env.token,
+                        token: internalToken,
                         namespace_key: nsKeys
                     });
                     if (kvRes && kvRes.result) {
