@@ -88,15 +88,16 @@ export default {
                 var results = await Promise.all(uuids.map(function(uuid) {
                     return (async function() {
                         try {
-                            var name = uuid.substring(0, 8);
-
-                            // 并行获取 IPv4 和 IPv6
+                            // 并行获取 hostname、IPv4、IPv6
                             var parts = await Promise.all([
+                                execOnAgent(token || env.token, uuid, 'hostname', []),
                                 execOnAgent(token || env.token, uuid, 'curl', ['-s', 'ip.sb']),
                                 execOnAgent(token || env.token, uuid, 'curl', ['-6', '-s', 'ip.sb'])
                             ]);
-                            var v4 = parts[0];
-                            var v6 = parts[1];
+                            var hostname = (parts[0] || '').trim().split('.')[0];
+                            var name = hostname || uuid.substring(0, 8);
+                            var v4 = parts[1];
+                            var v6 = parts[2];
 
                             var ipv4 = [];
                             var ipv6 = [];
