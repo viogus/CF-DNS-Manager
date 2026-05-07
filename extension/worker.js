@@ -84,28 +84,39 @@ export default {
                     ? rpc.result.uuids : [];
                 var servers = [];
 
-                for (var i = 0; i < uuids.length; i++) {
-                    var uuid = uuids[i];
-                    try {
-                        var name = uuid.substring(0, 8);
+                // 并行处理所有 agent
+                var results = await Promise.all(uuids.map(function(uuid) {
+                    return (async function() {
+                        try {
+                            var name = uuid.substring(0, 8);
 
-                        // 并行获取 IPv4 和 IPv6
-                        var v4 = await execOnAgent(token || env.token, uuid, 'curl', ['-s', 'ip.sb']);
-                        var v6 = await execOnAgent(token || env.token, uuid, 'curl', ['-6', '-s', 'ip.sb']);
+                            // 并行获取 IPv4 和 IPv6
+                            var parts = await Promise.all([
+                                execOnAgent(token || env.token, uuid, 'curl', ['-s', 'ip.sb']),
+                                execOnAgent(token || env.token, uuid, 'curl', ['-6', '-s', 'ip.sb'])
+                            ]);
+                            var v4 = parts[0];
+                            var v6 = parts[1];
 
-                        var ipv4 = [];
-                        var ipv6 = [];
+                            var ipv4 = [];
+                            var ipv6 = [];
 
-                        v4 = (v4 || '').replace(/[^0-9.]/g, '');
-                        if (v4 && isIPv4(v4)) ipv4.push(v4);
+                            v4 = (v4 || '').replace(/[^0-9.]/g, '');
+                            if (v4 && isIPv4(v4)) ipv4.push(v4);
 
-                        v6 = (v6 || '').replace(/[^0-9a-fA-F:]/g, '');
-                        if (v6 && isIPv6(v6)) ipv6.push(v6);
+                            v6 = (v6 || '').replace(/[^0-9a-fA-F:]/g, '');
+                            if (v6 && isIPv6(v6)) ipv6.push(v6);
 
-                        if (ipv4.length || ipv6.length) {
-                            servers.push({ name: name, ipv4: ipv4, ipv6: ipv6 });
-                        }
-                    } catch (e) {}
+                            if (ipv4.length || ipv6.length) {
+                                return { name: name, ipv4: ipv4, ipv6: ipv6 };
+                            }
+                        } catch (e) {}
+                        return null;
+                    })();
+                }));
+
+                for (var i = 0; i < results.length; i++) {
+                    if (results[i]) servers.push(results[i]);
                 }
 
                 return new Response(JSON.stringify(servers), {
