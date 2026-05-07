@@ -28,36 +28,33 @@ async function createTask(token, uuid, cmd, args) {
         token: token, target_uuid: uuid,
         task_type: { execute: { cmd: cmd, args: args } }
     });
-    return (r && r.result && r.result.id) ? { id: r.result.id, uuid: uuid } : null;
+    return (r && r.result && r.result.id) ? r.result.id : 0;
 }
 
-// 批量查询 task 结果
-async function batchQueryTasks(token, taskRefs) {
-    var resultMap = {};
-    if (taskRefs.length === 0) return resultMap;
-    var allResults = await Promise.all(taskRefs.map(function(ref) {
-        return (async function() {
-            try {
-                var q = await globalThis.nodeget('task_query', {
-                    token: token,
-                    task_data_query: { condition: [{ task_id: ref.id }, { type: 'execute' }] }
-                });
-                if (q && q.result && q.result.length > 0) {
-                    var t = q.result[0];
-                    if (t.success === true && t.task_event_result) {
-                        var o = t.task_event_result;
-                        var out = typeof o === 'object' && o ? String(o.execute || Object.values(o)[0] || '') : String(o);
-                        return { id: ref.id, value: out.trim() };
-                    }
+// 按 agent UUID 批量查 task 结果
+async function queryAgentTasks(token, uuid, taskIds) {
+    if (taskIds.length === 0) return {};
+    try {
+        var q = await globalThis.nodeget('task_query', {
+            token: token,
+            task_data_query: { condition: [{ uuid: uuid }, { type: 'execute' }, { limit: taskIds.length }] }
+        });
+        var resultMap = {};
+        if (q && q.result && q.result.length > 0) {
+            var idSet = {};
+            for (var k = 0; k < taskIds.length; k++) idSet[taskIds[k]] = true;
+            for (var j = 0; j < q.result.length; j++) {
+                var t = q.result[j];
+                if (!idSet[t.task_id]) continue;
+                if (t.success === true && t.task_event_result) {
+                    var o = t.task_event_result;
+                    var out = typeof o === 'object' && o ? String(o.execute || Object.values(o)[0] || '') : String(o);
+                    resultMap[t.task_id] = out.trim();
                 }
-            } catch (e) {}
-            return null;
-        })();
-    }));
-    for (var i = 0; i < allResults.length; i++) {
-        if (allResults[i]) resultMap[allResults[i].id] = allResults[i].value;
-    }
-    return resultMap;
+            }
+        }
+        return resultMap;
+    } catch (e) { return {}; }
 }
 
 export default {
@@ -122,7 +119,6 @@ export default {
 
                 var t = token || env.token;
 
-                // 阶段1：并行创建所有 task
                 var ipCmds = [
                     ['curl', ['-4', '-s', 'ip.sb']],
                     ['curl', ['-4', '-s', 'ifconfig.me']],
@@ -131,63 +127,56 @@ export default {
                     ['curl', ['-6', '-s', 'ifconfig.me']],
                     ['curl', ['-6', '-s', 'api6.ipify.org']]
                 ];
+
+                // 阶段1：全并行创建，按 agent 分组收集 taskId
+                var agentTasks = {};
                 var createPromises = [];
                 for (var ai = 0; ai < uuids.length; ai++) {
+                    agentTasks[uuids[ai]] = [];
                     for (var ci = 0; ci < ipCmds.length; ci++) {
                         createPromises.push((function(u, ci2) {
-                            return createTask(t, u, ipCmds[ci2][0], ipCmds[ci2][1]).then(function(ref) {
-                                if (ref) ref.cmdIdx = ci2;
-                                return ref;
+                            return createTask(t, u, ipCmds[ci2][0], ipCmds[ci2][1]).then(function(id) {
+                                if (id) agentTasks[u].push({ id: id, cmdIdx: ci2 });
                             });
                         })(uuids[ai], ci));
                     }
                 }
-                var allTasks = (await Promise.all(createPromises)).filter(function(r) { return r; });
+                await Promise.all(createPromises);
 
-                // 阶段2：等待 agent 执行
-                await sleep(3000);
+                // 阶段2：等 agent 执行
+                await sleep(2000);
 
-                // 阶段3：批量查询所有 task
-                var resultMap = await batchQueryTasks(t, allTasks);
-                var pending = [];
-                for (var pi = 0; pi < allTasks.length; pi++) {
-                    if (!(allTasks[pi].id in resultMap)) pending.push(allTasks[pi]);
-                }
-
-                // 阶段4：未完成的再等 2s 重试
-                if (pending.length > 0) {
-                    await sleep(2000);
-                    var resultMap2 = await batchQueryTasks(t, pending);
-                    for (var key in resultMap2) { resultMap[key] = resultMap2[key]; }
-                }
-
-                // 组装结果：每个 agent 取最快的 v4 和 v6
+                // 阶段3：按 agent 批量查（15 次 RPC，非 90 次）
                 var agentResults = {};
-                for (var ti = 0; ti < allTasks.length; ti++) {
-                    var ref = allTasks[ti];
-                    var raw = resultMap[ref.id];
-                    if (!raw) continue;
-                    var ver = ref.cmdIdx < 3 ? '4' : '6';
-                    var ip = parseIP(raw, ver);
-                    if (!ip) continue;
-                    var au = ref.uuid;
-                    if (!agentResults[au]) agentResults[au] = {};
-                    if (ver === '4' && !agentResults[au].v4) agentResults[au].v4 = ip;
-                    if (ver === '6' && !agentResults[au].v6) agentResults[au].v6 = ip;
-                }
+                var queryPromises = uuids.map(function(uuid) {
+                    return (async function() {
+                        var tasks = agentTasks[uuid] || [];
+                        if (tasks.length === 0) return;
+                        var ids = tasks.map(function(t) { return t.id; });
+                        var results = await queryAgentTasks(t, uuid, ids);
+
+                        var v4 = '', v6 = '';
+                        for (var ti = 0; ti < tasks.length; ti++) {
+                            var raw = results[tasks[ti].id];
+                            if (!raw) continue;
+                            var ver = tasks[ti].cmdIdx < 3 ? '4' : '6';
+                            if (ver === '4' && !v4) v4 = parseIP(raw, '4');
+                            if (ver === '6' && !v6) v6 = parseIP(raw, '6');
+                            if (v4 && v6) break;
+                        }
+                        if (v4 || v6) agentResults[uuid] = { v4: v4, v6: v6 };
+                    })();
+                });
+                await Promise.all(queryPromises);
 
                 var servers = [];
-                for (var au2 in agentResults) {
-                    var r = agentResults[au2];
-                    var v4 = r.v4 || '';
-                    var v6 = r.v6 || '';
-                    if (v4 || v6) {
-                        servers.push({
-                            name: nameMap[au2] || au2.substring(0, 8),
-                            ipv4: v4 ? [v4] : [],
-                            ipv6: v6 ? [v6] : []
-                        });
-                    }
+                for (var au in agentResults) {
+                    var r = agentResults[au];
+                    servers.push({
+                        name: nameMap[au] || au.substring(0, 8),
+                        ipv4: r.v4 ? [r.v4] : [],
+                        ipv6: r.v6 ? [r.v6] : []
+                    });
                 }
 
                 return new Response(JSON.stringify(servers), {
