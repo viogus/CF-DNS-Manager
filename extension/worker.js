@@ -176,17 +176,18 @@ export default {
                 });
                 await Promise.all(queryPromises);
 
-                // 阶段3：缺 v4 或 v6 的 agent 创建 fallback task
+                // 阶段3：缺 v4 或 v6 的 agent 创建全部 fallback task
                 var fallbackTasks = [];
                 for (var mi = 0; mi < uuids.length; mi++) {
                     var uuid = uuids[mi];
                     var r = agentResults[uuid];
-                    if (!r) {
+                    if (!r || !r.v4) {
                         fallbackTasks.push({ uuid: uuid, ver: '4', cmdIdx: 0 });
+                        fallbackTasks.push({ uuid: uuid, ver: '4', cmdIdx: 1 });
+                    }
+                    if (!r || !r.v6) {
                         fallbackTasks.push({ uuid: uuid, ver: '6', cmdIdx: 2 });
-                    } else {
-                        if (!r.v4) fallbackTasks.push({ uuid: uuid, ver: '4', cmdIdx: 0 });
-                        if (!r.v6) fallbackTasks.push({ uuid: uuid, ver: '6', cmdIdx: 2 });
+                        fallbackTasks.push({ uuid: uuid, ver: '6', cmdIdx: 3 });
                     }
                 }
 
