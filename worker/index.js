@@ -13,6 +13,7 @@ import * as rotations from './routes/rotations.js';
 import * as run from './routes/rotations/run.js';
 import * as dnspod from './routes/dnspod.js';
 import * as komari from './routes/komari.js';
+import * as nodeget from './routes/nodeget.js';
 
 const routes = [
   ['GET',    '/api/login',                          login],
@@ -41,6 +42,7 @@ const routes = [
   ['DELETE', '/api/zones/:zoneId/rotations',        rotations],
   ['POST',   '/api/rotations/run',                  run],
   ['GET',    '/api/komari/servers',                 komari],
+  ['GET',    '/api/nodeget/servers',                nodeget],
 ];
 
 const CORS_HEADERS = {
