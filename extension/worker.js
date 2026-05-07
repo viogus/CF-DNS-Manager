@@ -96,7 +96,7 @@ export default {
             try { auth = request.headers.get('Authorization') || ''; } catch (e) {}
             var token = auth.replace('Bearer ', '');
 
-            if (env.token && token !== env.token) {
+            if (!env.token || token !== env.token) {
                 return new Response(JSON.stringify({ error: 'Unauthorized' }), {
                     status: 401,
                     headers: { 'Content-Type': 'application/json' }
@@ -138,7 +138,7 @@ export default {
                             }
                         }
                     }
-                } catch (e) {}
+                } catch (e) { console.error('kv_get_multi_value failed:', e); }
 
                 // 回退：从 static monitoring 拿 hostname
                 try {
@@ -156,7 +156,7 @@ export default {
                             }
                         }
                     }
-                } catch (e) {}
+                } catch (e) { console.error('agent_static_data_multi_last_query failed:', e); }
 
                 // 最终回退
                 for (var ui = 0; ui < uuids.length; ui++) {
