@@ -91,9 +91,11 @@ export default {
 
                 var ipCmds = [
                     ['curl', ['-4', '-s', 'ip.sb']],
+                    ['curl', ['-6', '-s', 'ip.sb']]
+                ];
+                var ipFallback = [
                     ['curl', ['-4', '-s', 'ifconfig.me']],
                     ['curl', ['-4', '-s', 'api.ipify.org']],
-                    ['curl', ['-6', '-s', 'ip.sb']],
                     ['curl', ['-6', '-s', 'ifconfig.me']],
                     ['curl', ['-6', '-s', 'api6.ipify.org']]
                 ];
@@ -103,7 +105,7 @@ export default {
                     agentTasks[uuids[ai]] = [];
                 }
 
-                // 阶段1：KV name、static hostname、90 个 task 全部并行
+                // 阶段1：KV name、static hostname、首轮 30 个 task 全部并行
                 var parallelWork = [];
 
                 parallelWork.push((async function() {
@@ -137,10 +139,10 @@ export default {
                 })());
 
                 for (var ai = 0; ai < uuids.length; ai++) {
-                    for (var ci = 0; ci < ipCmds.length; ci++) {
+                    for (var ci = 0; ci < 2; ci++) {
                         parallelWork.push((function(u, ci2) {
                             return createTask(t, u, ipCmds[ci2][0], ipCmds[ci2][1]).then(function(id) {
-                                if (id) agentTasks[u].push({ id: id, cmdIdx: ci2 });
+                                if (id) agentTasks[u].push({ id: id, ver: ci2 === 0 ? '4' : '6' });
                             });
                         })(uuids[ai], ci));
                     }
@@ -151,10 +153,9 @@ export default {
                     if (!nameMap[uuids[ui]]) nameMap[uuids[ui]] = uuids[ui].substring(0, 8);
                 }
 
-                // 阶段2：等 agent 执行
                 await sleep(800);
 
-                // 阶段3：按 agent 批量查（15 次 RPC，非 90 次）
+                // 阶段2：查询首轮 30 个 task
                 var agentResults = {};
                 var queryPromises = uuids.map(function(uuid) {
                     return (async function() {
@@ -162,47 +163,69 @@ export default {
                         if (tasks.length === 0) return;
                         var ids = tasks.map(function(t) { return t.id; });
                         var results = await queryAgentTasks(t, uuid, ids);
-
                         var v4 = '', v6 = '';
                         for (var ti = 0; ti < tasks.length; ti++) {
                             var raw = results[tasks[ti].id];
                             if (!raw) continue;
-                            var ver = tasks[ti].cmdIdx < 3 ? '4' : '6';
-                            if (ver === '4' && !v4) v4 = parseIP(raw, '4');
-                            if (ver === '6' && !v6) v6 = parseIP(raw, '6');
-                            if (v4 && v6) break;
+                            var ip = parseIP(raw, tasks[ti].ver);
+                            if (tasks[ti].ver === '4' && !v4) v4 = ip;
+                            if (tasks[ti].ver === '6' && !v6) v6 = ip;
                         }
                         if (v4 || v6) agentResults[uuid] = { v4: v4, v6: v6 };
                     })();
                 });
                 await Promise.all(queryPromises);
 
-                // 阶段4：没拿到的 agent 再等 1.5s 重试
-                var missing = [];
+                // 阶段3：缺 v4 或 v6 的 agent 创建 fallback task
+                var fallbackTasks = [];
                 for (var mi = 0; mi < uuids.length; mi++) {
-                    if (!agentResults[uuids[mi]]) missing.push(uuids[mi]);
+                    var uuid = uuids[mi];
+                    var r = agentResults[uuid];
+                    if (!r) {
+                        fallbackTasks.push({ uuid: uuid, ver: '4', cmdIdx: 0 });
+                        fallbackTasks.push({ uuid: uuid, ver: '6', cmdIdx: 2 });
+                    } else {
+                        if (!r.v4) fallbackTasks.push({ uuid: uuid, ver: '4', cmdIdx: 0 });
+                        if (!r.v6) fallbackTasks.push({ uuid: uuid, ver: '6', cmdIdx: 2 });
+                    }
                 }
-                if (missing.length > 0) {
+
+                if (fallbackTasks.length > 0) {
+                    var fbPromises = fallbackTasks.map(function(fb) {
+                        return createTask(t, fb.uuid, ipFallback[fb.cmdIdx][0], ipFallback[fb.cmdIdx][1]).then(function(id) {
+                            if (id) { fb.id = id; return fb; }
+                            return null;
+                        });
+                    });
+                    var createdFbs = (await Promise.all(fbPromises)).filter(function(f) { return f; });
+
                     await sleep(1200);
-                    var retryPromises = missing.map(function(uuid) {
+
+                    // 按 agent 分组查询 fallback
+                    var fbByAgent = {};
+                    for (var fi = 0; fi < createdFbs.length; fi++) {
+                        var fb = createdFbs[fi];
+                        if (!fbByAgent[fb.uuid]) fbByAgent[fb.uuid] = [];
+                        fbByAgent[fb.uuid].push(fb);
+                    }
+
+                    var fbQueries = Object.keys(fbByAgent).map(function(uuid) {
                         return (async function() {
-                            var tasks = agentTasks[uuid] || [];
-                            if (tasks.length === 0) return;
-                            var ids = tasks.map(function(t) { return t.id; });
+                            var fbs = fbByAgent[uuid];
+                            var ids = fbs.map(function(f) { return f.id; });
                             var results = await queryAgentTasks(t, uuid, ids);
-                            var v4 = '', v6 = '';
-                            for (var ti = 0; ti < tasks.length; ti++) {
-                                var raw = results[tasks[ti].id];
+                            for (var fi = 0; fi < fbs.length; fi++) {
+                                var raw = results[fbs[fi].id];
                                 if (!raw) continue;
-                                var ver = tasks[ti].cmdIdx < 3 ? '4' : '6';
-                                if (ver === '4' && !v4) v4 = parseIP(raw, '4');
-                                if (ver === '6' && !v6) v6 = parseIP(raw, '6');
-                                if (v4 && v6) break;
+                                var ip = parseIP(raw, fbs[fi].ver);
+                                if (!ip) continue;
+                                if (!agentResults[uuid]) agentResults[uuid] = { v4: '', v6: '' };
+                                if (fbs[fi].ver === '4' && !agentResults[uuid].v4) agentResults[uuid].v4 = ip;
+                                if (fbs[fi].ver === '6' && !agentResults[uuid].v6) agentResults[uuid].v6 = ip;
                             }
-                            if (v4 || v6) agentResults[uuid] = { v4: v4, v6: v6 };
                         })();
                     });
-                    await Promise.all(retryPromises);
+                    await Promise.all(fbQueries);
                 }
 
                 var servers = [];
