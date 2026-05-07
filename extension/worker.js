@@ -75,7 +75,6 @@ export default {
             }
 
             try {
-                // Step 1: 获取所有 agent UUID
                 var rpc = await globalThis.nodeget('nodeget-server_list_all_agent_uuid', {
                     token: token || env.token
                 });
@@ -88,8 +87,29 @@ export default {
                     });
                 }
 
-                // Step 2: 批量获取 static monitoring → system_host_name 作为 name
+                // 获取自定义名称：KV metadata_name → hostname → UUID 前缀
                 var nameMap = {};
+
+                // 优先从 KV 拿自定义名称
+                try {
+                    var nsKeys = uuids.map(function(u) {
+                        return { namespace: u, key: 'metadata_name' };
+                    });
+                    var kvRes = await globalThis.nodeget('kv_get_multi_value', {
+                        token: token || env.token,
+                        namespace_key: nsKeys
+                    });
+                    if (kvRes && kvRes.result) {
+                        for (var k = 0; k < kvRes.result.length; k++) {
+                            var entry = kvRes.result[k];
+                            if (entry.value) {
+                                nameMap[entry.namespace] = String(entry.value);
+                            }
+                        }
+                    }
+                } catch (e) {}
+
+                // 回退：从 static monitoring 拿 hostname
                 try {
                     var staticRes = await globalThis.nodeget('agent_static_data_multi_last_query', {
                         token: token || env.token,
@@ -97,19 +117,26 @@ export default {
                         fields: ['system']
                     });
                     if (staticRes && staticRes.result) {
-                        for (var k = 0; k < staticRes.result.length; k++) {
-                            var item = staticRes.result[k];
-                            var hn = (item.system && item.system.system_host_name) || '';
-                            nameMap[item.uuid] = hn || item.uuid.substring(0, 8);
+                        for (var k2 = 0; k2 < staticRes.result.length; k2++) {
+                            var item = staticRes.result[k2];
+                            if (!nameMap[item.uuid]) {
+                                var hn = (item.system && item.system.system_host_name) || '';
+                                nameMap[item.uuid] = hn || item.uuid.substring(0, 8);
+                            }
                         }
                     }
                 } catch (e) {}
 
-                // Step 3: 并行获取所有 agent 的 IP
+                // 最终回退
+                for (var ui = 0; ui < uuids.length; ui++) {
+                    if (!nameMap[uuids[ui]]) nameMap[uuids[ui]] = uuids[ui].substring(0, 8);
+                }
+
+                // 并行获取 IP
                 var results = await Promise.all(uuids.map(function(uuid) {
                     return (async function() {
                         try {
-                            var name = nameMap[uuid] || uuid.substring(0, 8);
+                            var name = nameMap[uuid];
 
                             var parts = await Promise.all([
                                 execOnAgent(token || env.token, uuid, 'curl', ['-s', 'ip.sb']),
