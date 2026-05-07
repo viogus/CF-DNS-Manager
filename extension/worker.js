@@ -14,7 +14,36 @@ function sleep(ms) {
     return new Promise(function(resolve) { setTimeout(resolve, ms); });
 }
 
-async function execOnAgent(token, uuid, cmd, args) {
+async var ipv4Services = [
+    { cmd: 'curl', args: ['-4', '-s', 'ip.sb'] },
+    { cmd: 'curl', args: ['-4', '-s', 'ifconfig.me'] },
+    { cmd: 'curl', args: ['-4', '-s', 'api.ipify.org'] }
+];
+
+var ipv6Services = [
+    { cmd: 'curl', args: ['-6', '-s', 'ip.sb'] },
+    { cmd: 'curl', args: ['-6', '-s', 'ifconfig.me'] },
+    { cmd: 'curl', args: ['-6', '-s', 'api6.ipify.org'] }
+];
+
+async function getAgentIP(token, uuid, ver) {
+    var services = ver === '6' ? ipv6Services : ipv4Services;
+    for (var i = 0; i < services.length; i++) {
+        var svc = services[i];
+        var result = await execOnAgent(token, uuid, svc.cmd, svc.args);
+        result = (result || '').trim();
+        if (result && ver === '6') {
+            result = result.replace(/[^0-9a-fA-F:]/g, '');
+            if (isIPv6(result)) return result;
+        } else if (result) {
+            result = result.replace(/[^0-9.]/g, '');
+            if (isIPv4(result)) return result;
+        }
+    }
+    return '';
+}
+
+function execOnAgent(token, uuid, cmd, args) {
     var createRes = await globalThis.nodeget('task_create_task', {
         token: token,
         target_uuid: uuid,
@@ -139,8 +168,8 @@ export default {
                             var name = nameMap[uuid];
 
                             var parts = await Promise.all([
-                                execOnAgent(token || env.token, uuid, 'curl', ['-s', 'ip.sb']),
-                                execOnAgent(token || env.token, uuid, 'curl', ['-6', '-s', 'ip.sb'])
+                                getAgentIP(token || env.token, uuid, '4'),
+                                getAgentIP(token || env.token, uuid, '6')
                             ]);
                             var v4 = parts[0];
                             var v6 = parts[1];
