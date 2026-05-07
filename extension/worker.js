@@ -36,8 +36,8 @@ async function execOnAgent(token, uuid, cmd, args) {
         ? createRes.result.id : null;
     if (!taskId) return '';
 
-    for (var j = 0; j < 30; j++) {
-        await sleep(500);
+    for (var j = 0; j < 50; j++) {
+        await sleep(200);
         try {
             var qRes = await globalThis.nodeget('task_query', {
                 token: token,
