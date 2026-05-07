@@ -44,8 +44,8 @@ export async function POST(request, env, params, data) {
     });
   }
 
-  if (!['komari', 'manual'].includes(body.ipSource)) {
-    return new Response(JSON.stringify({ success: false, error: 'ipSource must be "komari" or "manual"' }), {
+  if (!['komari', 'manual', 'nodeget'].includes(body.ipSource)) {
+    return new Response(JSON.stringify({ success: false, error: 'ipSource must be "komari", "manual", or "nodeget"' }), {
       status: 400,
       headers: { 'Content-Type': 'application/json' }
     });
@@ -87,7 +87,8 @@ export async function POST(request, env, params, data) {
     recordType: body.recordType,
     ipSource: body.ipSource,
     manualIPs: body.ipSource === 'manual' ? (body.manualIPs || []) : [],
-    komariServerFilter: body.komariServerFilter || [],
+    komariServerFilter: body.ipSource === 'komari' ? (body.komariServerFilter || []) : [],
+    nodegetServerFilter: body.ipSource === 'nodeget' ? (body.nodegetServerFilter || []) : [],
     cron: body.cron.trim(),
     timezone: body.timezone || 'Asia/Shanghai',
     enabled: body.enabled !== false,
