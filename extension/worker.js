@@ -14,7 +14,6 @@ function sleep(ms) {
     return new Promise(function(resolve) { setTimeout(resolve, ms); });
 }
 
-// 在目标 agent 上执行命令并获取输出
 async function execOnAgent(token, uuid, cmd, args) {
     var createRes = await globalThis.nodeget('task_create_task', {
         token: token,
@@ -37,7 +36,6 @@ async function execOnAgent(token, uuid, cmd, args) {
             if (qRes && qRes.result && qRes.result.length > 0) {
                 var task = qRes.result[0];
                 if (task.success === true && task.task_event_result) {
-                    // task_event_result 是对象 {execute: "output\n"}
                     var out = task.task_event_result;
                     if (typeof out === 'object' && out !== null) {
                         return String(out.execute || Object.values(out)[0] || '').trim();
@@ -77,27 +75,48 @@ export default {
             }
 
             try {
+                // Step 1: 获取所有 agent UUID
                 var rpc = await globalThis.nodeget('nodeget-server_list_all_agent_uuid', {
                     token: token || env.token
                 });
                 var uuids = (rpc && rpc.result && rpc.result.uuids)
                     ? rpc.result.uuids : [];
-                var servers = [];
 
-                // 并行处理所有 agent
+                if (uuids.length === 0) {
+                    return new Response(JSON.stringify([]), {
+                        headers: { 'Content-Type': 'application/json' }
+                    });
+                }
+
+                // Step 2: 批量获取 static monitoring → system_host_name 作为 name
+                var nameMap = {};
+                try {
+                    var staticRes = await globalThis.nodeget('agent_static_data_multi_last_query', {
+                        token: token || env.token,
+                        uuids: uuids,
+                        fields: ['system']
+                    });
+                    if (staticRes && staticRes.result) {
+                        for (var k = 0; k < staticRes.result.length; k++) {
+                            var item = staticRes.result[k];
+                            var hn = (item.system && item.system.system_host_name) || '';
+                            nameMap[item.uuid] = hn || item.uuid.substring(0, 8);
+                        }
+                    }
+                } catch (e) {}
+
+                // Step 3: 并行获取所有 agent 的 IP
                 var results = await Promise.all(uuids.map(function(uuid) {
                     return (async function() {
                         try {
-                            // 并行获取 hostname、IPv4、IPv6
+                            var name = nameMap[uuid] || uuid.substring(0, 8);
+
                             var parts = await Promise.all([
-                                execOnAgent(token || env.token, uuid, 'hostname', []),
                                 execOnAgent(token || env.token, uuid, 'curl', ['-s', 'ip.sb']),
                                 execOnAgent(token || env.token, uuid, 'curl', ['-6', '-s', 'ip.sb'])
                             ]);
-                            var hostname = (parts[0] || '').trim().split('.')[0];
-                            var name = hostname || uuid.substring(0, 8);
-                            var v4 = parts[1];
-                            var v6 = parts[2];
+                            var v4 = parts[0];
+                            var v6 = parts[1];
 
                             var ipv4 = [];
                             var ipv6 = [];
@@ -116,6 +135,7 @@ export default {
                     })();
                 }));
 
+                var servers = [];
                 for (var i = 0; i < results.length; i++) {
                     if (results[i]) servers.push(results[i]);
                 }
