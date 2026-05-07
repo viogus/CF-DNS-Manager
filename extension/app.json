@@ -1,0 +1,15 @@
+{
+    "name": "cf-dns-ip-source",
+    "icon": "icon.svg",
+    "routes": [],
+    "worker": {
+        "filename": "worker.js",
+        "env": {
+            "token": "YOUR_TOKEN_HERE"
+        }
+    },
+    "version": "1.0.0",
+    "description": "Expose agent IPs in Komari-compatible format for CF-DNS-Manager rotation",
+    "author": "CF-DNS-Manager",
+    "license": "MIT"
+}
