@@ -14,31 +14,14 @@ function sleep(ms) {
     return new Promise(function(resolve) { setTimeout(resolve, ms); });
 }
 
-var ipv4Services = [
-    { cmd: 'curl', args: ['-4', '-s', 'ip.sb'] },
-    { cmd: 'curl', args: ['-4', '-s', 'ifconfig.me'] },
-    { cmd: 'curl', args: ['-4', '-s', 'api.ipify.org'] }
-];
 
-var ipv6Services = [
-    { cmd: 'curl', args: ['-6', '-s', 'ip.sb'] },
-    { cmd: 'curl', args: ['-6', '-s', 'ifconfig.me'] },
-    { cmd: 'curl', args: ['-6', '-s', 'api6.ipify.org'] }
-];
-
-async function getAgentIP(token, uuid, ver) {
-    var services = ver === '6' ? ipv6Services : ipv4Services;
-    for (var i = 0; i < services.length; i++) {
-        var svc = services[i];
-        var result = await execOnAgent(token, uuid, svc.cmd, svc.args);
-        result = (result || '').trim();
-        if (result && ver === '6') {
-            result = result.replace(/[^0-9a-fA-F:]/g, '');
-            if (isIPv6(result)) return result;
-        } else if (result) {
-            result = result.replace(/[^0-9.]/g, '');
-            if (isIPv4(result)) return result;
-        }
+function extractIP(parts, ver) {
+    for (var i = 0; i < parts.length; i++) {
+        var raw = (parts[i] || '').trim();
+        if (!raw) continue;
+        raw = ver === '6' ? raw.replace(/[^0-9a-fA-F:]/g, '') : raw.replace(/[^0-9.]/g, '');
+        if (ver === '6' && isIPv6(raw)) return raw;
+        if (ver === '4' && isIPv4(raw)) return raw;
     }
     return '';
 }
@@ -163,27 +146,29 @@ export default {
                     if (!nameMap[uuids[ui]]) nameMap[uuids[ui]] = uuids[ui].substring(0, 8);
                 }
 
-                // 并行获取 IP
+                // 并行获取 IP：一次性执行所有 IP 服务，取最快结果
                 var results = await Promise.all(uuids.map(function(uuid) {
                     return (async function() {
                         try {
                             var name = nameMap[uuid];
+                            var t = token || env.token;
 
-                            var parts = await Promise.all([
-                                getAgentIP(token || env.token, uuid, '4'),
-                                getAgentIP(token || env.token, uuid, '6')
+                            var v4Parts = await Promise.all([
+                                execOnAgent(t, uuid, 'curl', ['-4', '-s', 'ip.sb']),
+                                execOnAgent(t, uuid, 'curl', ['-4', '-s', 'ifconfig.me']),
+                                execOnAgent(t, uuid, 'curl', ['-4', '-s', 'api.ipify.org'])
                             ]);
-                            var v4 = parts[0];
-                            var v6 = parts[1];
+                            var v6Parts = await Promise.all([
+                                execOnAgent(t, uuid, 'curl', ['-6', '-s', 'ip.sb']),
+                                execOnAgent(t, uuid, 'curl', ['-6', '-s', 'ifconfig.me']),
+                                execOnAgent(t, uuid, 'curl', ['-6', '-s', 'api6.ipify.org'])
+                            ]);
 
-                            var ipv4 = [];
-                            var ipv6 = [];
+                            var v4 = extractIP(v4Parts, '4');
+                            var v6 = extractIP(v6Parts, '6');
 
-                            v4 = (v4 || '').replace(/[^0-9.]/g, '');
-                            if (v4 && isIPv4(v4)) ipv4.push(v4);
-
-                            v6 = (v6 || '').replace(/[^0-9a-fA-F:]/g, '');
-                            if (v6 && isIPv6(v6)) ipv6.push(v6);
+                            var ipv4 = v4 ? [v4] : [];
+                            var ipv6 = v6 ? [v6] : [];
 
                             if (ipv4.length || ipv6.length) {
                                 return { name: name, ipv4: ipv4, ipv6: ipv6 };
