@@ -169,6 +169,34 @@ export default {
                 });
                 await Promise.all(queryPromises);
 
+                // 阶段4：没拿到的 agent 再等 1.5s 重试
+                var missing = [];
+                for (var mi = 0; mi < uuids.length; mi++) {
+                    if (!agentResults[uuids[mi]]) missing.push(uuids[mi]);
+                }
+                if (missing.length > 0) {
+                    await sleep(1500);
+                    var retryPromises = missing.map(function(uuid) {
+                        return (async function() {
+                            var tasks = agentTasks[uuid] || [];
+                            if (tasks.length === 0) return;
+                            var ids = tasks.map(function(t) { return t.id; });
+                            var results = await queryAgentTasks(t, uuid, ids);
+                            var v4 = '', v6 = '';
+                            for (var ti = 0; ti < tasks.length; ti++) {
+                                var raw = results[tasks[ti].id];
+                                if (!raw) continue;
+                                var ver = tasks[ti].cmdIdx < 3 ? '4' : '6';
+                                if (ver === '4' && !v4) v4 = parseIP(raw, '4');
+                                if (ver === '6' && !v6) v6 = parseIP(raw, '6');
+                                if (v4 && v6) break;
+                            }
+                            if (v4 || v6) agentResults[uuid] = { v4: v4, v6: v6 };
+                        })();
+                    });
+                    await Promise.all(retryPromises);
+                }
+
                 var servers = [];
                 for (var au in agentResults) {
                     var r = agentResults[au];
