@@ -87,36 +87,6 @@ export default {
 
                 var nameMap = {};
                 var internalToken = env.super_token || token;
-                try {
-                    var nsKeys = uuids.map(function(u) { return { namespace: u, key: 'metadata_name' }; });
-                    var kvRes = await globalThis.nodeget('kv_get_multi_value', { token: internalToken, namespace_key: nsKeys });
-                    if (kvRes && kvRes.result) {
-                        for (var k = 0; k < kvRes.result.length; k++) {
-                            var entry = kvRes.result[k];
-                            if (entry.value) nameMap[entry.namespace] = String(entry.value);
-                        }
-                    }
-                } catch (e) { console.error('kv_get_multi_value failed:', e); }
-
-                try {
-                    var staticRes = await globalThis.nodeget('agent_static_data_multi_last_query', {
-                        token: token || env.token, uuids: uuids, fields: ['system']
-                    });
-                    if (staticRes && staticRes.result) {
-                        for (var k2 = 0; k2 < staticRes.result.length; k2++) {
-                            var item = staticRes.result[k2];
-                            if (!nameMap[item.uuid]) {
-                                var hn = (item.system && item.system.system_host_name) || '';
-                                nameMap[item.uuid] = hn || item.uuid.substring(0, 8);
-                            }
-                        }
-                    }
-                } catch (e) { console.error('agent_static_data_multi_last_query failed:', e); }
-
-                for (var ui = 0; ui < uuids.length; ui++) {
-                    if (!nameMap[uuids[ui]]) nameMap[uuids[ui]] = uuids[ui].substring(0, 8);
-                }
-
                 var t = token || env.token;
 
                 var ipCmds = [
@@ -128,20 +98,58 @@ export default {
                     ['curl', ['-6', '-s', 'api6.ipify.org']]
                 ];
 
-                // 阶段1：全并行创建，按 agent 分组收集 taskId
                 var agentTasks = {};
-                var createPromises = [];
                 for (var ai = 0; ai < uuids.length; ai++) {
                     agentTasks[uuids[ai]] = [];
+                }
+
+                // 阶段1：KV name、static hostname、90 个 task 全部并行
+                var parallelWork = [];
+
+                parallelWork.push((async function() {
+                    try {
+                        var nsKeys = uuids.map(function(u) { return { namespace: u, key: 'metadata_name' }; });
+                        var kvRes = await globalThis.nodeget('kv_get_multi_value', { token: internalToken, namespace_key: nsKeys });
+                        if (kvRes && kvRes.result) {
+                            for (var k = 0; k < kvRes.result.length; k++) {
+                                var entry = kvRes.result[k];
+                                if (entry.value) nameMap[entry.namespace] = String(entry.value);
+                            }
+                        }
+                    } catch (e) { console.error('kv_get_multi_value failed:', e); }
+                })());
+
+                parallelWork.push((async function() {
+                    try {
+                        var staticRes = await globalThis.nodeget('agent_static_data_multi_last_query', {
+                            token: t, uuids: uuids, fields: ['system']
+                        });
+                        if (staticRes && staticRes.result) {
+                            for (var k2 = 0; k2 < staticRes.result.length; k2++) {
+                                var item = staticRes.result[k2];
+                                if (!nameMap[item.uuid]) {
+                                    var hn = (item.system && item.system.system_host_name) || '';
+                                    nameMap[item.uuid] = hn || item.uuid.substring(0, 8);
+                                }
+                            }
+                        }
+                    } catch (e) { console.error('agent_static_data_multi_last_query failed:', e); }
+                })());
+
+                for (var ai = 0; ai < uuids.length; ai++) {
                     for (var ci = 0; ci < ipCmds.length; ci++) {
-                        createPromises.push((function(u, ci2) {
+                        parallelWork.push((function(u, ci2) {
                             return createTask(t, u, ipCmds[ci2][0], ipCmds[ci2][1]).then(function(id) {
                                 if (id) agentTasks[u].push({ id: id, cmdIdx: ci2 });
                             });
                         })(uuids[ai], ci));
                     }
                 }
-                await Promise.all(createPromises);
+                await Promise.all(parallelWork);
+
+                for (var ui = 0; ui < uuids.length; ui++) {
+                    if (!nameMap[uuids[ui]]) nameMap[uuids[ui]] = uuids[ui].substring(0, 8);
+                }
 
                 // 阶段2：等 agent 执行
                 await sleep(2000);
