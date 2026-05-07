@@ -2,10 +2,22 @@
     "name": "cf-dns-ip-source",
     "icon": "icon.svg",
     "routes": [],
+    "limits": [
+        {
+            "scopes": [
+                { "global": null }
+            ],
+            "permissions": [
+                { "node_get": "list_all_agent_uuid" },
+                { "task": { "create": "all" } },
+                { "task": { "read": "all" } }
+            ]
+        }
+    ],
     "worker": {
         "filename": "worker.js",
         "env": {
-            "token": "YOUR_TOKEN_HERE"
+            "token": "TOKEN_WILL_BE_AUTO_GENERATED"
         }
     },
     "version": "1.0.0",
