@@ -137,6 +137,22 @@ export async function PATCH(request, env, params, data) {
     existing.cron = body.cron.trim();
   }
   if (body.timezone !== undefined) existing.timezone = body.timezone;
+  if (body.komariServerFilter !== undefined) {
+    existing.komariServerFilter = Array.isArray(body.komariServerFilter) ? body.komariServerFilter : [];
+    existing.currentIndex = 0;
+  }
+  if (body.nodegetServerFilter !== undefined) {
+    existing.nodegetServerFilter = Array.isArray(body.nodegetServerFilter) ? body.nodegetServerFilter : [];
+    existing.currentIndex = 0;
+  }
+  if (body.manualIPs !== undefined) {
+    existing.manualIPs = Array.isArray(body.manualIPs) ? body.manualIPs : [];
+    existing.currentIndex = 0;
+  }
+  if (body.ipSource !== undefined && ['komari', 'manual', 'nodeget'].includes(body.ipSource)) {
+    if (body.ipSource !== existing.ipSource) existing.currentIndex = 0;
+    existing.ipSource = body.ipSource;
+  }
   existing.updatedAt = new Date().toISOString();
 
   await putRotation(env, existing);
