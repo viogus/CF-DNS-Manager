@@ -152,7 +152,7 @@ export default {
                 }
 
                 // 阶段2：等 agent 执行
-                await sleep(2000);
+                await sleep(800);
 
                 // 阶段3：按 agent 批量查（15 次 RPC，非 90 次）
                 var agentResults = {};
@@ -183,7 +183,7 @@ export default {
                     if (!agentResults[uuids[mi]]) missing.push(uuids[mi]);
                 }
                 if (missing.length > 0) {
-                    await sleep(1500);
+                    await sleep(1200);
                     var retryPromises = missing.map(function(uuid) {
                         return (async function() {
                             var tasks = agentTasks[uuid] || [];
