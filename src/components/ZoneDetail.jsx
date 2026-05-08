@@ -650,36 +650,20 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
         }
     };
 
-    const deleteRecord = async (id) => {
-        openConfirm(t('confirmTitle'), t('confirmDelete'), async () => {
-            const res = await fetch(`/api/zones/${zone.id}/dns_records?id=${id}`, {
-                method: 'DELETE',
-                headers: getHeaders()
-            });
-            if (res.ok) {
-                fetchDNS();
-                showToast(t('deleteSuccess'));
-            } else {
-                const data = await res.json().catch(() => ({}));
-                showToast(data.message || t('errorOccurred'), 'error');
-            }
+    const confirmDelete = (confirmKey, url, onSuccess) => {
+        openConfirm(t('confirmTitle'), t(confirmKey), async () => {
+            const res = await fetch(url, { method: 'DELETE', headers: getHeaders() });
+            if (res.ok) { onSuccess(); showToast(t('deleteSuccess')); }
+            else { const data = await res.json().catch(() => ({})); showToast(data.message || t('errorOccurred'), 'error'); }
         });
     };
 
+    const deleteRecord = async (id) => {
+        confirmDelete('confirmDelete', `/api/zones/${zone.id}/dns_records?id=${id}`, fetchDNS);
+    };
+
     const deleteSaaS = async (id) => {
-        openConfirm(t('confirmTitle'), t('confirmDeleteSaaS'), async () => {
-            const res = await fetch(`/api/zones/${zone.id}/custom_hostnames?id=${id}`, {
-                method: 'DELETE',
-                headers: getHeaders()
-            });
-            if (res.ok) {
-                fetchHostnames();
-                showToast(t('deleteSuccess'));
-            } else {
-                const data = await res.json().catch(() => ({}));
-                showToast(data.message || t('errorOccurred'), 'error');
-            }
-        });
+        confirmDelete('confirmDeleteSaaS', `/api/zones/${zone.id}/custom_hostnames?id=${id}`, fetchHostnames);
     };
 
     const toggleProxied = async (record) => {
