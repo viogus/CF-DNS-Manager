@@ -1,5 +1,5 @@
 import { listAllRotations, putRotation } from './_kv';
-import { normalizeServers, isIPv4, isIPv6, toArray } from '../_normalize.js';
+import { normalizeServers } from '../_normalize.js';
 
 async function fetchKomariServers(env) {
   const baseUrl = env.KOMARI_BASE_URL;
@@ -34,24 +34,15 @@ async function fetchNodegetServers(env) {
   } catch { return []; }
 }
 
-function getIPsFromServers(servers, rotation) {
+function getIPsFromServers(servers, rotation, filterKey) {
   let filtered = servers;
-  if (rotation.komariServerFilter && rotation.komariServerFilter.length > 0) {
-    filtered = servers.filter(s => rotation.komariServerFilter.includes(s.name));
+  var f = rotation[filterKey];
+  if (f && f.length > 0) {
+    filtered = servers.filter(function(s) { return f.includes(s.name); });
   }
   return rotation.recordType === 'AAAA'
-    ? filtered.flatMap(s => s.ipv6)
-    : filtered.flatMap(s => s.ipv4);
-}
-
-function getIPsFromNodegetServers(servers, rotation) {
-  let filtered = servers;
-  if (rotation.nodegetServerFilter && rotation.nodegetServerFilter.length > 0) {
-    filtered = servers.filter(s => rotation.nodegetServerFilter.includes(s.name));
-  }
-  return rotation.recordType === 'AAAA'
-    ? filtered.flatMap(s => s.ipv6)
-    : filtered.flatMap(s => s.ipv4);
+    ? filtered.flatMap(function(s) { return s.ipv6; })
+    : filtered.flatMap(function(s) { return s.ipv4; });
 }
 
 /** Match a single cron field value against a target number */
@@ -165,9 +156,9 @@ export async function runRotations(env) {
 
     try {
       if (rotation.ipSource === 'komari') {
-        ipPool = getIPsFromServers(komariServers, rotation);
+        ipPool = getIPsFromServers(komariServers, rotation, 'komariServerFilter');
       } else if (rotation.ipSource === 'nodeget') {
-        ipPool = getIPsFromNodegetServers(nodegetServers, rotation);
+        ipPool = getIPsFromServers(nodegetServers, rotation, 'nodegetServerFilter');
       } else {
         ipPool = rotation.manualIPs || [];
       }
