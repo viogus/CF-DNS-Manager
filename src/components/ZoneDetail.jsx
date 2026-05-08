@@ -1412,7 +1412,7 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
 
             {/* Rotation Modal */}
             <Modal open={showRotationModal} onClose={() => { setShowRotationModal(false); setEditingRotation(null); }}>
-                <h2 style={{ marginBottom: '1.5rem' }}>{editingRotation ? t('editRotation') : t('createRotation')}</h2>
+                        <h2 style={{ marginBottom: '1.5rem' }}>{editingRotation ? t('editRotation') : t('createRotation')}</h2>
                         <form onSubmit={handleRotationSubmit}>
                             <div className="input-row">
                                 <label>{t('selectRecord')}</label>
@@ -1531,8 +1531,6 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
             </Modal>
 
             {/* DNS Modal */}
-            {showDNSModal && (
-                <div
             <Modal open={showDNSModal} onClose={() => { setShowDNSModal(false); setEditingRecord(null); }}>
                         <h2 style={{ marginBottom: '1.5rem' }}>{editingRecord ? t('editRecord') : t('addModalTitle')}</h2>
                         <form onSubmit={handleDNSSubmit}>
@@ -1802,7 +1800,6 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
             </Modal>
 
             {/* SaaS Modal */}
-            {showSaaSModal && (
             <Modal open={showSaaSModal} onClose={() => { setShowSaaSModal(false); setEditingSaaS(null); setNewSaaS(initialSaaS); }}>
                         <h2 style={{ marginBottom: '1.5rem' }}>{editingSaaS ? t('editSaaS') : t('addSaaS')}</h2>
                         <form onSubmit={handleSaaSSubmit}>
@@ -1889,7 +1886,6 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
 
             {/* Confirm Modal */}
             <Modal open={confirmModal.show} onClose={() => setConfirmModal({ ...confirmModal, show: false })} zIndex={2000}>
-                <div style={{ textAlign: 'center' }}>
                         <div style={{ width: '48px', height: '48px', background: '#fff5f5', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.25rem' }}>
                             <AlertCircle size={24} color="var(--error)" />
                         </div>
@@ -1902,13 +1898,9 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
                                 setConfirmModal({ ...confirmModal, show: false });
                             }}>{t('yes')}</button>
                         </div>
-                </div>
             </Modal>
             {/* Verification Modal */}
-            {showVerifyModal && verifyingSaaS && (
             <Modal open={showVerifyModal && !!verifyingSaaS} onClose={() => setShowVerifyModal(false)}>
-                >
-                    <div className="glass-card fade-in" style={{ padding: '2rem', maxWidth: '600px', width: '90%', maxHeight: '90vh', overflowY: 'auto' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                             <h2 style={{ margin: 0 }}>{t('verificationRecords')}</h2>
                             <button className="btn btn-outline" style={{ padding: '4px', border: 'none' }} onClick={() => setShowVerifyModal(false)}>
@@ -2029,6 +2021,7 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
                                 </div>
                             )}
                         </div>
+
             </Modal>
         </div >
     );
