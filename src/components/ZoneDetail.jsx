@@ -37,6 +37,27 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
     // Komari 集成
     const { komariEnabled, ipToNameMap: komariIpToNameMap, getOptions: getKomariOptions, servers: komariServers } = useKomari(auth);
     const { nodegetEnabled, ipToNameMap: nodegetIpToNameMap, getOptions: getNodegetOptions, servers: nodegetServers } = useNodeget(auth);
+
+    const IPTag = ({ content, compact }) => {
+        const names = [
+            ...((komariEnabled && komariIpToNameMap.get(content)) || []),
+            ...((nodegetEnabled && nodegetIpToNameMap.get(content)) || [])
+        ];
+        if (!names.length) return null;
+        return (
+            <span style={{
+                marginLeft: compact ? '4px' : '6px',
+                padding: compact ? '1px 5px' : '1px 6px',
+                borderRadius: compact ? '8px' : '10px',
+                background: '#f0f0ff', color: '#6366f1',
+                fontSize: compact ? '0.625rem' : '0.6875rem',
+                border: '1px solid #c7d2fe', whiteSpace: 'nowrap'
+            }}>
+                {names.join(', ')}
+            </span>
+        );
+    };
+
     const [expandedRecords, setExpandedRecords] = useState(new Set());
     const [showVerifyModal, setShowVerifyModal] = useState(false);
     const [verifyingSaaS, setVerifyingSaaS] = useState(null);
@@ -1014,11 +1035,7 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
                                             </td>
                                             <td className="truncate-mobile" style={{ color: 'var(--text-muted)', fontSize: '0.8125rem' }}>
                                                 {record.content}
-                                                {((komariEnabled && komariIpToNameMap.has(record.content)) || (nodegetEnabled && nodegetIpToNameMap.has(record.content))) && (
-                                                    <span style={{ marginLeft: '6px', padding: '1px 6px', borderRadius: '10px', background: '#f0f0ff', color: '#6366f1', fontSize: '0.6875rem', border: '1px solid #c7d2fe', whiteSpace: 'nowrap' }}>
-                                                        {[...(komariIpToNameMap.get(record.content) || []), ...(nodegetIpToNameMap.get(record.content) || [])].join(', ')}
-                                                    </span>
-                                                )}
+                                                <IPTag content={record.content} />
                                             </td>
                                             <td style={{ fontSize: '0.8125rem' }}>{record.ttl === 1 ? t('ttlAuto') : record.ttl}</td>
                                             <td>
@@ -1100,11 +1117,7 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
                                                         showToast(t('copied'));
                                                     }}>
                                                         {record.content}
-                                                        {komariEnabled && ipToNameMap.has(record.content) && (
-                                                            <span style={{ marginLeft: '4px', padding: '1px 5px', borderRadius: '8px', background: '#f0f0ff', color: '#6366f1', fontSize: '0.625rem', border: '1px solid #c7d2fe', whiteSpace: 'nowrap' }}>
-                                                                {ipToNameMap.get(record.content).join(', ')}
-                                                            </span>
-                                                        )}
+                                                        <IPTag content={record.content} compact />
                                                     </div>
                                                     <div className="ttl-box">
                                                         <span className="ttl-label">TTL</span>
