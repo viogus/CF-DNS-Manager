@@ -38,6 +38,8 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
     const { komariEnabled, ipToNameMap: komariIpToNameMap, getOptions: getKomariOptions, servers: komariServers } = useKomari(auth);
     const { nodegetEnabled, ipToNameMap: nodegetIpToNameMap, getOptions: getNodegetOptions, servers: nodegetServers } = useNodeget(auth);
 
+    const sourceLabel = (ipSource) => t('rotationSource' + ipSource.charAt(0).toUpperCase() + ipSource.slice(1));
+
     const IPTag = ({ content, compact }) => {
         const names = [
             ...((komariEnabled && komariIpToNameMap.get(content)) || []),
@@ -1302,7 +1304,7 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
                                                         <td style={{ fontWeight: 600 }}>{rot.recordName}</td>
                                                         <td><span className="badge badge-blue">{rot.recordType}</span></td>
                                                         <td style={{ fontSize: '0.8125rem' }}>
-                                                            {rot.ipSource === 'komari' ? t('rotationSourceKomari') : rot.ipSource === 'nodeget' ? t('rotationSourceNodeget') : t('rotationSourceManual')}
+                                                            {sourceLabel(rot.ipSource)}
                                                         </td>
                                                         <td style={{ fontSize: '0.8125rem' }}>{describeCron(rot.cron, rot.timezone)}</td>
                                                         <td style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{rot.timezone || 'UTC'}</td>
@@ -1349,7 +1351,7 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
                                                 </div>
                                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                                     <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                                                        <div>{rot.ipSource === 'komari' ? t('rotationSourceKomari') : rot.ipSource === 'nodeget' ? t('rotationSourceNodeget') : t('rotationSourceManual')}</div>
+                                                        <div>{sourceLabel(rot.ipSource)}</div>
                                                         <div>{describeCron(rot.cron, rot.timezone)} {rot.lastRotatedAt ? '· ' + new Date(rot.lastRotatedAt).toLocaleDateString() : ''}</div>
                                                     </div>
                                                     <div style={{ display: 'flex', gap: '4px' }}>
