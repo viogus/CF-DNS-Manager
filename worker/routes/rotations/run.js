@@ -155,6 +155,7 @@ export async function runRotations(env) {
     if (!rotation.cron || !cronMatches(rotation.cron, now, rotation.timezone || 'Asia/Shanghai')) continue;
 
     try {
+      let ipPool;
       if (rotation.ipSource === 'komari') {
         ipPool = getIPsFromServers(komariServers, rotation, 'komariServerFilter');
       } else if (rotation.ipSource === 'nodeget') {

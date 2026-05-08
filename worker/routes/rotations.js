@@ -128,7 +128,15 @@ export async function PATCH(request, env, params, data) {
     });
   }
 
-  const body = await request.json();
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return new Response(JSON.stringify({ success: false, error: 'Invalid JSON' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
 
   if (body.enabled !== undefined) existing.enabled = !!body.enabled;
   if (body.cron !== undefined) {
