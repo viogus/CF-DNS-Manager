@@ -9,6 +9,11 @@ function isValidCron(expr) {
   return parts.every(part => CRON_FIELD_RE.test(part));
 }
 
+function validateIPs(ips) {
+  const validIP = (ip) => /^[0-9.]+$/.test(ip) && ip.includes('.') || /:/.test(ip);
+  return ips.find(ip => !validIP(ip)) || null;
+}
+
 export async function GET(request, env, params, data) {
   const { zoneId } = params;
   const rotations = await listRotationsForZone(env, zoneId);
@@ -59,8 +64,7 @@ export async function POST(request, env, params, data) {
   }
 
   if (body.ipSource === 'manual' && body.manualIPs) {
-    const validIP = (ip) => /^[0-9.]+$/.test(ip) && ip.includes('.') || /:/.test(ip);
-    const invalid = body.manualIPs.find(ip => !validIP(ip));
+    const invalid = validateIPs(body.manualIPs);
     if (invalid) {
       return new Response(JSON.stringify({ success: false, error: `Invalid IP address: ${invalid}` }), {
         status: 400,
@@ -149,8 +153,7 @@ export async function PATCH(request, env, params, data) {
     if (!Array.isArray(body.manualIPs)) {
       body.manualIPs = [];
     }
-    const validIP = (ip) => /^[0-9.]+$/.test(ip) && ip.includes('.') || /:/.test(ip);
-    const invalid = body.manualIPs.find(ip => !validIP(ip));
+    const invalid = validateIPs(body.manualIPs);
     if (invalid) {
       return new Response(JSON.stringify({ success: false, error: `Invalid IP address: ${invalid}` }), {
         status: 400,
