@@ -54,67 +54,6 @@ function getIPsFromNodegetServers(servers, rotation) {
     : filtered.flatMap(s => s.ipv4);
 }
 
-async function fetchKomariIPs(env, rotation) {
-  const baseUrl = env.KOMARI_BASE_URL;
-  const apiToken = env.KOMARI_API_TOKEN;
-  if (!baseUrl) return [];
-
-  try {
-    let apiBase = baseUrl.trim().replace(/\/+$/, '');
-    if (!/\/api$/.test(apiBase)) apiBase += '/api';
-    const url = `${apiBase}/admin/client/list`;
-
-    const headers = {};
-    if (apiToken) headers['Authorization'] = `Bearer ${apiToken}`;
-
-    const res = await fetch(url, { headers });
-    if (!res.ok) return [];
-
-    const payload = await res.json();
-    let servers = normalizeServers(payload);
-
-    if (rotation.komariServerFilter && rotation.komariServerFilter.length > 0) {
-      servers = servers.filter(s => rotation.komariServerFilter.includes(s.name));
-    }
-
-    return rotation.recordType === 'AAAA'
-      ? servers.flatMap(s => s.ipv6)
-      : servers.flatMap(s => s.ipv4);
-  } catch {
-    return [];
-  }
-}
-
-async function fetchNodegetIPs(env, rotation) {
-  const baseUrl = env.NODEGET_BASE_URL;
-  const apiToken = env.NODEGET_API_TOKEN;
-  if (!baseUrl) return [];
-
-  try {
-    let apiBase = baseUrl.trim().replace(/\/+$/, '');
-    const url = `${apiBase}/api/servers`;
-
-    const headers = {};
-    if (apiToken) headers['Authorization'] = `Bearer ${apiToken}`;
-
-    const res = await fetch(url, { headers });
-    if (!res.ok) return [];
-
-    const payload = await res.json();
-    let servers = normalizeServers(payload);
-
-    if (rotation.nodegetServerFilter && rotation.nodegetServerFilter.length > 0) {
-      servers = servers.filter(s => rotation.nodegetServerFilter.includes(s.name));
-    }
-
-    return rotation.recordType === 'AAAA'
-      ? servers.flatMap(s => s.ipv6)
-      : servers.flatMap(s => s.ipv4);
-  } catch {
-    return [];
-  }
-}
-
 /** Match a single cron field value against a target number */
 function matchField(field, value) {
   if (field === '*') return true;
@@ -225,15 +164,10 @@ export async function runRotations(env) {
     if (!rotation.cron || !cronMatches(rotation.cron, now, rotation.timezone || 'Asia/Shanghai')) continue;
 
     try {
-      let ipPool;
       if (rotation.ipSource === 'komari') {
-        ipPool = komariServers
-          ? getIPsFromServers(komariServers, rotation)
-          : await fetchKomariIPs(env, rotation);
+        ipPool = getIPsFromServers(komariServers, rotation);
       } else if (rotation.ipSource === 'nodeget') {
-        ipPool = nodegetServers
-          ? getIPsFromNodegetServers(nodegetServers, rotation)
-          : await fetchNodegetIPs(env, rotation);
+        ipPool = getIPsFromNodegetServers(nodegetServers, rotation);
       } else {
         ipPool = rotation.manualIPs || [];
       }
