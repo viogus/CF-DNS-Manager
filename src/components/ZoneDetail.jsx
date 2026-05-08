@@ -40,6 +40,30 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
 
     const sourceLabel = (ipSource) => t('rotationSource' + ipSource.charAt(0).toUpperCase() + ipSource.slice(1));
 
+    const ServerFilter = ({ servers, filter, filterKey, label }) => (
+        <div className="input-row">
+            <label>{label}</label>
+            <div style={{ flex: 1, display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                {servers.map(s => (
+                    <label key={s.name} style={{ fontSize: '0.8125rem', display: 'flex', alignItems: 'center', gap: '4px', padding: '2px 6px', background: filter.includes(s.name) ? '#fff7ed' : '#f9fafb', borderRadius: '6px', cursor: 'pointer', border: '1px solid var(--border)' }}>
+                        <input type="checkbox" checked={filter.includes(s.name)}
+                            onChange={(e) => {
+                                setNewRotation(prev => ({
+                                    ...prev,
+                                    [filterKey]: e.target.checked
+                                        ? [...prev[filterKey], s.name]
+                                        : prev[filterKey].filter(n => n !== s.name)
+                                }));
+                            }}
+                            style={{ width: '14px', height: '14px' }} />
+                        {s.name}
+                    </label>
+                ))}
+                {servers.length === 0 && <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>...</span>}
+            </div>
+        </div>
+    );
+
     const IPTag = ({ content, compact }) => {
         const names = [
             ...((komariEnabled && komariIpToNameMap.get(content)) || []),
@@ -1418,54 +1442,12 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
                                 </div>
                             </div>
                             {newRotation.ipSource === 'komari' && (
-                                <div className="input-row">
-                                    <label>{t('komariServers')}</label>
-                                    <div style={{ flex: 1, display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                                        {komariServers.map(s => (
-                                            <label key={s.name} style={{ fontSize: '0.8125rem', display: 'flex', alignItems: 'center', gap: '4px', padding: '2px 6px', background: newRotation.komariServerFilter.includes(s.name) ? '#fff7ed' : '#f9fafb', borderRadius: '6px', cursor: 'pointer', border: '1px solid var(--border)' }}>
-                                                <input
-                                                    type="checkbox"
-                                                    checked={newRotation.komariServerFilter.includes(s.name)}
-                                                    onChange={(e) => {
-                                                        if (e.target.checked) {
-                                                            setNewRotation({ ...newRotation, komariServerFilter: [...newRotation.komariServerFilter, s.name] });
-                                                        } else {
-                                                            setNewRotation({ ...newRotation, komariServerFilter: newRotation.komariServerFilter.filter(n => n !== s.name) });
-                                                        }
-                                                    }}
-                                                    style={{ width: '14px', height: '14px' }}
-                                                />
-                                                {s.name}
-                                            </label>
-                                        ))}
-                                        {komariServers.length === 0 && <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>...</span>}
-                                    </div>
-                                </div>
+                                <ServerFilter servers={komariServers} filter={newRotation.komariServerFilter}
+                                    filterKey="komariServerFilter" label={t('komariServers')} />
                             )}
                             {newRotation.ipSource === 'nodeget' && (
-                                <div className="input-row">
-                                    <label>{t('nodegetServers')}</label>
-                                    <div style={{ flex: 1, display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                                        {nodegetServers.map(s => (
-                                            <label key={s.name} style={{ fontSize: '0.8125rem', display: 'flex', alignItems: 'center', gap: '4px', padding: '2px 6px', background: newRotation.nodegetServerFilter.includes(s.name) ? '#fff7ed' : '#f9fafb', borderRadius: '6px', cursor: 'pointer', border: '1px solid var(--border)' }}>
-                                                <input
-                                                    type="checkbox"
-                                                    checked={newRotation.nodegetServerFilter.includes(s.name)}
-                                                    onChange={(e) => {
-                                                        if (e.target.checked) {
-                                                            setNewRotation({ ...newRotation, nodegetServerFilter: [...newRotation.nodegetServerFilter, s.name] });
-                                                        } else {
-                                                            setNewRotation({ ...newRotation, nodegetServerFilter: newRotation.nodegetServerFilter.filter(n => n !== s.name) });
-                                                        }
-                                                    }}
-                                                    style={{ width: '14px', height: '14px' }}
-                                                />
-                                                {s.name}
-                                            </label>
-                                        ))}
-                                        {nodegetServers.length === 0 && <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>...</span>}
-                                    </div>
-                                </div>
+                                <ServerFilter servers={nodegetServers} filter={newRotation.nodegetServerFilter}
+                                    filterKey="nodegetServerFilter" label={t('nodegetServers')} />
                             )}
                             {newRotation.ipSource === 'manual' && (
                                 <div className="input-row">
