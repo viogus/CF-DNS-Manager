@@ -40,6 +40,18 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
 
     const sourceLabel = (ipSource) => t('rotationSource' + ipSource.charAt(0).toUpperCase() + ipSource.slice(1));
 
+    const Modal = ({ open, onClose, children, zIndex = 1000 }) => {
+        if (!open) return null;
+        return (
+            <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex }}
+                onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+                <div className="glass-card fade-in" style={{ padding: '2rem', maxWidth: '500px', width: '90%', position: 'relative', maxHeight: '90vh', overflowY: 'auto' }}>
+                    {children}
+                </div>
+            </div>
+        );
+    };
+
     const ServerFilter = ({ servers, filter, filterKey, label }) => (
         <div className="input-row">
             <label>{label}</label>
@@ -1399,13 +1411,8 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
             </div>
 
             {/* Rotation Modal */}
-            {showRotationModal && (
-                <div
-                    style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }}
-                    onClick={(e) => { if (e.target === e.currentTarget) { setShowRotationModal(false); setEditingRotation(null); } }}
-                >
-                    <div className="glass-card fade-in" style={{ padding: '2rem', maxWidth: '500px', width: '90%', position: 'relative', maxHeight: '90vh', overflowY: 'auto' }}>
-                        <h2 style={{ marginBottom: '1.5rem' }}>{editingRotation ? t('editRotation') : t('createRotation')}</h2>
+            <Modal open={showRotationModal} onClose={() => { setShowRotationModal(false); setEditingRotation(null); }}>
+                <h2 style={{ marginBottom: '1.5rem' }}>{editingRotation ? t('editRotation') : t('createRotation')}</h2>
                         <form onSubmit={handleRotationSubmit}>
                             <div className="input-row">
                                 <label>{t('selectRecord')}</label>
@@ -1521,17 +1528,12 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
                                 </button>
                             </div>
                         </form>
-                    </div>
-                </div>
-            )}
+            </Modal>
 
             {/* DNS Modal */}
             {showDNSModal && (
                 <div
-                    style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }}
-                    onClick={(e) => { if (e.target === e.currentTarget) setShowDNSModal(false); }}
-                >
-                    <div className="glass-card fade-in" style={{ padding: '2rem', maxWidth: '450px', width: '90%', position: 'relative' }}>
+            <Modal open={showDNSModal} onClose={() => { setShowDNSModal(false); setEditingRecord(null); }}>
                         <h2 style={{ marginBottom: '1.5rem' }}>{editingRecord ? t('editRecord') : t('addModalTitle')}</h2>
                         <form onSubmit={handleDNSSubmit}>
                             <div className="input-row">
@@ -1797,17 +1799,11 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
                                 <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>{t('save')}</button>
                             </div>
                         </form>
-                    </div>
-                </div>
-            )}
+            </Modal>
 
             {/* SaaS Modal */}
             {showSaaSModal && (
-                <div
-                    style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }}
-                    onClick={(e) => { if (e.target === e.currentTarget) { setShowSaaSModal(false); setEditingSaaS(null); setNewSaaS(initialSaaS); } }}
-                >
-                    <div className="glass-card fade-in" style={{ padding: '2rem', maxWidth: '450px', width: '90%', position: 'relative' }}>
+            <Modal open={showSaaSModal} onClose={() => { setShowSaaSModal(false); setEditingSaaS(null); setNewSaaS(initialSaaS); }}>
                         <h2 style={{ marginBottom: '1.5rem' }}>{editingSaaS ? t('editSaaS') : t('addSaaS')}</h2>
                         <form onSubmit={handleSaaSSubmit}>
                             <div className="input-row">
@@ -1889,17 +1885,11 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
                                 <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>{t('save')}</button>
                             </div>
                         </form>
-                    </div>
-                </div>
-            )}
+            </Modal>
 
             {/* Confirm Modal */}
-            {confirmModal.show && (
-                <div
-                    style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 2000 }}
-                    onClick={(e) => { if (e.target === e.currentTarget) setConfirmModal({ ...confirmModal, show: false }); }}
-                >
-                    <div className="glass-card fade-in" style={{ padding: '2rem', maxWidth: '400px', width: '90%', textAlign: 'center' }}>
+            <Modal open={confirmModal.show} onClose={() => setConfirmModal({ ...confirmModal, show: false })} zIndex={2000}>
+                <div style={{ textAlign: 'center' }}>
                         <div style={{ width: '48px', height: '48px', background: '#fff5f5', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.25rem' }}>
                             <AlertCircle size={24} color="var(--error)" />
                         </div>
@@ -1912,14 +1902,11 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
                                 setConfirmModal({ ...confirmModal, show: false });
                             }}>{t('yes')}</button>
                         </div>
-                    </div>
                 </div>
-            )}
+            </Modal>
             {/* Verification Modal */}
             {showVerifyModal && verifyingSaaS && (
-                <div
-                    style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }}
-                    onClick={(e) => { if (e.target === e.currentTarget) setShowVerifyModal(false); }}
+            <Modal open={showVerifyModal && !!verifyingSaaS} onClose={() => setShowVerifyModal(false)}>
                 >
                     <div className="glass-card fade-in" style={{ padding: '2rem', maxWidth: '600px', width: '90%', maxHeight: '90vh', overflowY: 'auto' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
@@ -2042,10 +2029,7 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
                                 </div>
                             )}
                         </div>
-
-                    </div>
-                </div>
-            )}
+            </Modal>
         </div >
     );
 };
