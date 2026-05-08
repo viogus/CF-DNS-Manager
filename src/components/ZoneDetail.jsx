@@ -64,6 +64,23 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
         </div>
     );
 
+    const IPSelect = ({ enabled, getOptions, label, placeholder, record, setRecord }) => {
+        if (!enabled || !['A', 'AAAA'].includes(record.type)) return null;
+        const opts = getOptions(record.type);
+        if (!opts.length) return null;
+        return (
+            <div className="input-row">
+                <label>{label}</label>
+                <div style={{ flex: 1 }}>
+                    <CustomSelect value={record.content}
+                        onChange={(e) => setRecord({ ...record, content: e.target.value })}
+                        options={[{ value: '', label: placeholder }, ...opts]}
+                        placeholder={placeholder} />
+                </div>
+            </div>
+        );
+    };
+
     const IPTag = ({ content, compact }) => {
         const names = [
             ...((komariEnabled && komariIpToNameMap.get(content)) || []),
@@ -1555,38 +1572,12 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
                                 </div>
                             )}
 
-                            {komariEnabled && ['A', 'AAAA'].includes(newRecord.type) && (() => {
-                                const opts = getKomariOptions(newRecord.type);
-                                return opts.length > 0 ? (
-                                    <div className="input-row">
-                                        <label>{t('komariServer')}</label>
-                                        <div style={{ flex: 1 }}>
-                                            <CustomSelect
-                                                value={newRecord.content}
-                                                onChange={(e) => setNewRecord({ ...newRecord, content: e.target.value })}
-                                                options={[{ value: '', label: t('komariSelectPlaceholder') }, ...opts]}
-                                                placeholder={t('komariSelectPlaceholder')}
-                                            />
-                                        </div>
-                                    </div>
-                                ) : null;
-                            })()}
-                            {nodegetEnabled && ['A', 'AAAA'].includes(newRecord.type) && (() => {
-                                const opts = getNodegetOptions(newRecord.type);
-                                return opts.length > 0 ? (
-                                    <div className="input-row">
-                                        <label>{t('nodegetServer')}</label>
-                                        <div style={{ flex: 1 }}>
-                                            <CustomSelect
-                                                value={newRecord.content}
-                                                onChange={(e) => setNewRecord({ ...newRecord, content: e.target.value })}
-                                                options={[{ value: '', label: t('nodegetSelectPlaceholder') }, ...opts]}
-                                                placeholder={t('nodegetSelectPlaceholder')}
-                                            />
-                                        </div>
-                                    </div>
-                                ) : null;
-                            })()}
+                            <IPSelect enabled={komariEnabled} getOptions={getKomariOptions}
+                                label={t('komariServer')} placeholder={t('komariSelectPlaceholder')}
+                                record={newRecord} setRecord={setNewRecord} />
+                            <IPSelect enabled={nodegetEnabled} getOptions={getNodegetOptions}
+                                label={t('nodegetServer')} placeholder={t('nodegetSelectPlaceholder')}
+                                record={newRecord} setRecord={setNewRecord} />
 
                             {newRecord.type === 'SRV' && (
                                 <>
