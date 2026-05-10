@@ -35,14 +35,16 @@ async function fetchNodegetServers(env) {
 }
 
 function getIPsFromServers(servers, rotation, filterKey) {
-  let filtered = servers;
-  var f = rotation[filterKey];
-  if (f && f.length > 0) {
-    filtered = servers.filter(function(s) { return f.includes(s.name); });
+  const f = rotation[filterKey];
+  if (!f || !f.length) {
+    return rotation.recordType === 'AAAA'
+      ? servers.flatMap(s => s.ipv6)
+      : servers.flatMap(s => s.ipv4);
   }
+  const filtered = servers.filter(s => f.includes(s.name));
   return rotation.recordType === 'AAAA'
-    ? filtered.flatMap(function(s) { return s.ipv6; })
-    : filtered.flatMap(function(s) { return s.ipv4; });
+    ? filtered.flatMap(s => s.ipv6)
+    : filtered.flatMap(s => s.ipv4);
 }
 
 /** Match a single cron field value against a target number */

@@ -1885,7 +1885,6 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
             </Modal>
 
             {/* Confirm Modal */}
-            {confirmModal.show && (
             <Modal open={confirmModal.show} onClose={() => setConfirmModal({ ...confirmModal, show: false })} zIndex={2000}>
                         <div style={{ width: '48px', height: '48px', background: '#fff5f5', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.25rem' }}>
                             <AlertCircle size={24} color="var(--error)" />
@@ -1900,9 +1899,7 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
                             }}>{t('yes')}</button>
                         </div>
             </Modal>
-            )}
             {/* Verification Modal */}
-            {showVerifyModal && verifyingSaaS && (
             <Modal open={showVerifyModal && !!verifyingSaaS} onClose={() => setShowVerifyModal(false)}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                             <h2 style={{ margin: 0 }}>{t('verificationRecords')}</h2>
@@ -2026,7 +2023,6 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
                         </div>
 
             </Modal>
-            )}
         </div >
     );
 };
