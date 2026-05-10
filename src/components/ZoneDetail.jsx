@@ -1900,6 +1900,7 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
                         </div>
             </Modal>
             {/* Verification Modal */}
+            {showVerifyModal && verifyingSaaS && (
             <Modal open={showVerifyModal && !!verifyingSaaS} onClose={() => setShowVerifyModal(false)}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                             <h2 style={{ margin: 0 }}>{t('verificationRecords')}</h2>
@@ -2023,6 +2024,7 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
                         </div>
 
             </Modal>
+            )}
         </div >
     );
 };
