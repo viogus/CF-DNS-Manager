@@ -1,5 +1,4 @@
 const ROTATION_PREFIX = 'rotation:';
-const META_KEY = 'rotation:meta:v2';
 
 function rotationKey(zoneId, recordId) {
   return `${ROTATION_PREFIX}${zoneId}:${recordId}`;
@@ -16,15 +15,6 @@ function kv(env) {
   return env.DNS_ROTATIONS;
 }
 
-async function getMetaIndex(env) {
-  const val = await kv(env).get(META_KEY);
-  return val ? JSON.parse(val) : [];
-}
-
-async function saveMetaIndex(env, keys) {
-  await kv(env).put(META_KEY, JSON.stringify([...new Set(keys)]));
-}
-
 export async function getRotation(env, zoneId, recordId) {
   try {
     const val = await kv(env).get(rotationKey(zoneId, recordId));
@@ -38,27 +28,29 @@ export async function getRotation(env, zoneId, recordId) {
 export async function putRotation(env, config) {
   const key = rotationKey(config.zoneId, config.recordId);
   await kv(env).put(key, JSON.stringify(config));
-
-  const meta = await getMetaIndex(env);
-  if (!meta.includes(key)) {
-    meta.push(key);
-    await saveMetaIndex(env, meta);
-  }
 }
 
 export async function deleteRotation(env, zoneId, recordId) {
   const key = rotationKey(zoneId, recordId);
   await kv(env).delete(key);
-
-  const meta = await getMetaIndex(env);
-  await saveMetaIndex(env, meta.filter(k => k !== key));
 }
 
 export async function listRotationsForZone(env, zoneId) {
   try {
-    const meta = await getMetaIndex(env);
     const prefix = zonePrefix(zoneId);
-    const keys = meta.filter(k => k.startsWith(prefix));
+    let keys = [];
+    let list_complete = false;
+    let cursor = undefined;
+
+    while (!list_complete) {
+      const listResult = await kv(env).list({ prefix, cursor });
+      keys.push(...listResult.keys.map(k => k.name));
+      list_complete = listResult.list_complete;
+      if (!list_complete) {
+        cursor = listResult.cursor;
+      }
+    }
+    
     if (keys.length === 0) return [];
     const results = await Promise.all(keys.map(k => kv(env).get(k)));
     return results.filter(Boolean).map(r => JSON.parse(r));
@@ -70,9 +62,21 @@ export async function listRotationsForZone(env, zoneId) {
 
 export async function listAllRotations(env) {
   try {
-    const meta = await getMetaIndex(env);
-    if (meta.length === 0) return [];
-    const results = await Promise.all(meta.map(k => kv(env).get(k)));
+    let keys = [];
+    let list_complete = false;
+    let cursor = undefined;
+
+    while (!list_complete) {
+      const listResult = await kv(env).list({ prefix: ROTATION_PREFIX, cursor });
+      keys.push(...listResult.keys.map(k => k.name));
+      list_complete = listResult.list_complete;
+      if (!list_complete) {
+        cursor = listResult.cursor;
+      }
+    }
+
+    if (keys.length === 0) return [];
+    const results = await Promise.all(keys.map(k => kv(env).get(k)));
     return results.filter(Boolean).map(r => JSON.parse(r));
   } catch (e) {
     if (e.message.includes('not bound')) return [];
