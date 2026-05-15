@@ -1,11 +1,20 @@
 const ROTATION_PREFIX = 'rotation:';
 
+let _listCache = null;
+let _listCacheTs = 0;
+const LIST_CACHE_TTL = 90_000; // 90s > cron interval, guarantees alternating cache hits
+
 function rotationKey(zoneId, recordId) {
   return `${ROTATION_PREFIX}${zoneId}:${recordId}`;
 }
 
 function zonePrefix(zoneId) {
   return `${ROTATION_PREFIX}${zoneId}:`;
+}
+
+function bustCache() {
+  _listCache = null;
+  _listCacheTs = 0;
 }
 
 function kv(env) {
@@ -28,11 +37,13 @@ export async function getRotation(env, zoneId, recordId) {
 export async function putRotation(env, config) {
   const key = rotationKey(config.zoneId, config.recordId);
   await kv(env).put(key, JSON.stringify(config));
+  bustCache();
 }
 
 export async function deleteRotation(env, zoneId, recordId) {
   const key = rotationKey(zoneId, recordId);
   await kv(env).delete(key);
+  bustCache();
 }
 
 export async function listRotationsForZone(env, zoneId) {
@@ -61,6 +72,7 @@ export async function listRotationsForZone(env, zoneId) {
 }
 
 export async function listAllRotations(env) {
+  if (_listCache && Date.now() - _listCacheTs < LIST_CACHE_TTL) return _listCache;
   try {
     let keys = [];
     let list_complete = false;
@@ -75,9 +87,16 @@ export async function listAllRotations(env) {
       }
     }
 
-    if (keys.length === 0) return [];
+    if (keys.length === 0) {
+      _listCache = [];
+      _listCacheTs = Date.now();
+      return [];
+    }
     const results = await Promise.all(keys.map(k => kv(env).get(k)));
-    return results.filter(Boolean).map(r => JSON.parse(r));
+    const parsed = results.filter(Boolean).map(r => JSON.parse(r));
+    _listCache = parsed;
+    _listCacheTs = Date.now();
+    return parsed;
   } catch (e) {
     if (e.message.includes('not bound')) return [];
     throw e;
