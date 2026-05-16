@@ -10,4 +10,4 @@ directory = "dist"
 # id = "PLACEHOLDER_KV_ID"
 
 [triggers]
-crons = ["* * * * *"]
+crons = ["*/5 * * * *"]

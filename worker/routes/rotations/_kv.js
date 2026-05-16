@@ -2,7 +2,7 @@ const ROTATION_PREFIX = 'rotation:';
 
 let _listCache = null;
 let _listCacheTs = 0;
-const LIST_CACHE_TTL = 120_000;
+const LIST_CACHE_TTL = 300_000;
 
 function rotationKey(zoneId, recordId) {
   return `${ROTATION_PREFIX}${zoneId}:${recordId}`;
