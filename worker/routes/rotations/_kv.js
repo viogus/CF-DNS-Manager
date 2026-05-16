@@ -2,7 +2,7 @@ const ROTATION_PREFIX = 'rotation:';
 
 let _listCache = null;
 let _listCacheTs = 0;
-const LIST_CACHE_TTL = 90_000; // 90s > cron interval, guarantees alternating cache hits
+const LIST_CACHE_TTL = 120_000;
 
 function rotationKey(zoneId, recordId) {
   return `${ROTATION_PREFIX}${zoneId}:${recordId}`;
@@ -10,11 +10,6 @@ function rotationKey(zoneId, recordId) {
 
 function zonePrefix(zoneId) {
   return `${ROTATION_PREFIX}${zoneId}:`;
-}
-
-function bustCache() {
-  _listCache = null;
-  _listCacheTs = 0;
 }
 
 function kv(env) {
@@ -25,6 +20,10 @@ function kv(env) {
 }
 
 export async function getRotation(env, zoneId, recordId) {
+  if (_listCache) {
+    const cached = _listCache.find(r => r.zoneId === zoneId && r.recordId === recordId);
+    if (cached) return cached;
+  }
   try {
     const val = await kv(env).get(rotationKey(zoneId, recordId));
     return val ? JSON.parse(val) : null;
@@ -37,38 +36,28 @@ export async function getRotation(env, zoneId, recordId) {
 export async function putRotation(env, config) {
   const key = rotationKey(config.zoneId, config.recordId);
   await kv(env).put(key, JSON.stringify(config));
-  bustCache();
+  if (_listCache) {
+    const idx = _listCache.findIndex(r => r.zoneId === config.zoneId && r.recordId === config.recordId);
+    if (idx >= 0) {
+      _listCache[idx] = config;
+    } else {
+      _listCache.push(config);
+    }
+  }
 }
 
 export async function deleteRotation(env, zoneId, recordId) {
   const key = rotationKey(zoneId, recordId);
   await kv(env).delete(key);
-  bustCache();
+  if (_listCache) {
+    const idx = _listCache.findIndex(r => r.zoneId === zoneId && r.recordId === recordId);
+    if (idx >= 0) _listCache.splice(idx, 1);
+  }
 }
 
 export async function listRotationsForZone(env, zoneId) {
-  try {
-    const prefix = zonePrefix(zoneId);
-    let keys = [];
-    let list_complete = false;
-    let cursor = undefined;
-
-    while (!list_complete) {
-      const listResult = await kv(env).list({ prefix, cursor });
-      keys.push(...listResult.keys.map(k => k.name));
-      list_complete = listResult.list_complete;
-      if (!list_complete) {
-        cursor = listResult.cursor;
-      }
-    }
-    
-    if (keys.length === 0) return [];
-    const results = await Promise.all(keys.map(k => kv(env).get(k)));
-    return results.filter(Boolean).map(r => JSON.parse(r));
-  } catch (e) {
-    if (e.message.includes('not bound')) return [];
-    throw e;
-  }
+  const all = await listAllRotations(env);
+  return all.filter(r => r.zoneId === zoneId);
 }
 
 export async function listAllRotations(env) {
