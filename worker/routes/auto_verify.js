@@ -6,6 +6,21 @@
 
 import { callDnspodApi } from './_tc3';
 
+let _domainListCache = null;
+let _domainListCacheTs = 0;
+const DOMAIN_LIST_CACHE_TTL = 300_000;
+
+async function getDomainList(secretId, secretKey) {
+  const key = `${secretId}:${secretKey}`;
+  if (_domainListCache && _domainListCache.key === key && Date.now() - _domainListCacheTs < DOMAIN_LIST_CACHE_TTL) {
+    return _domainListCache.data;
+  }
+  const result = await callDnspodApi(secretId, secretKey, 'DescribeDomainList', {});
+  _domainListCache = { key, data: result };
+  _domainListCacheTs = Date.now();
+  return result;
+}
+
 /**
  * 从主机名中提取可能的域名列表
  * 例如 "app.shop.customer.com" -> ["shop.customer.com", "customer.com"]
@@ -50,7 +65,7 @@ export async function POST(request, env, params, data) {
       });
     }
 
-    const domainListResult = await callDnspodApi(dnspodSecretId, dnspodSecretKey, 'DescribeDomainList', {});
+    const domainListResult = await getDomainList(dnspodSecretId, dnspodSecretKey);
 
     if (domainListResult.Response?.Error) {
       return new Response(JSON.stringify({
@@ -105,25 +120,18 @@ export async function POST(request, env, params, data) {
       RecordType: record_type
     });
 
-    if (listResult.Response?.RecordList?.length > 0) {
-      for (const oldRecord of listResult.Response.RecordList) {
-        if (oldRecord.Value === txt_value) {
-          return new Response(JSON.stringify({
-            success: true,
-            message: 'Record already exists with same value',
-            record_id: oldRecord.RecordId,
-            domain: matchedDomain,
-            sub_domain: subDomain
-          }), {
-            headers: { 'Content-Type': 'application/json' }
-          });
-        }
-
-        await callDnspodApi(dnspodSecretId, dnspodSecretKey, 'DeleteRecord', {
-          Domain: matchedDomain,
-          RecordId: oldRecord.RecordId
-        });
-      }
+    const existingRecords = listResult.Response?.RecordList || [];
+    const alreadyExists = existingRecords.find(r => r.Value === txt_value);
+    if (alreadyExists) {
+      return new Response(JSON.stringify({
+        success: true,
+        message: 'Record already exists with same value',
+        record_id: alreadyExists.RecordId,
+        domain: matchedDomain,
+        sub_domain: subDomain
+      }), {
+        headers: { 'Content-Type': 'application/json' }
+      });
     }
 
     const createResult = await callDnspodApi(dnspodSecretId, dnspodSecretKey, 'CreateRecord', {
