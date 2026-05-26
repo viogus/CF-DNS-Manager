@@ -21,7 +21,9 @@ There is no test suite or linting configured.
 
 ### Frontend (`src/`)
 
-- **`src/App.jsx`** — Single monolithic component file containing ALL UI: login, zone list, DNS records CRUD, SSL for SaaS custom hostnames, DNSPod management, and Komari server selector. Approx. 3000 lines. i18n is inlined (~200 lines of translation objects, `zh`/`en`).
+- **`src/App.jsx`** — App shell: login, auth state, zone selection, and page routing (Cloudflare vs DNSPod). ~340 lines.
+- **`src/components/ZoneDetail.jsx`** — DNS records CRUD, SSL for SaaS custom hostnames, rotation management. Approx. 1400 lines.
+- **`src/hooks/useTranslate.js`** — i18n hook with `zh`/`en` translation objects.
 - **`src/index.css`** and **`src/mobile.css`** — Global and mobile-responsive styles.
 
 ### Backend (`functions/api/`)
