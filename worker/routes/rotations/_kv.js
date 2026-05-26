@@ -20,7 +20,7 @@ function kv(env) {
 }
 
 export async function getRotation(env, zoneId, recordId) {
-  if (_listCache) {
+  if (_listCache && Date.now() - _listCacheTs < LIST_CACHE_TTL) {
     const cached = _listCache.find(r => r.zoneId === zoneId && r.recordId === recordId);
     if (cached) return cached;
   }

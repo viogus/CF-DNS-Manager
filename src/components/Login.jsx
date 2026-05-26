@@ -25,7 +25,6 @@ const Login = ({ onLogin, t, lang, onLangChange }) => {
         const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
         if (window.location.protocol === 'http:' && !isLocalhost) {
             setError(t('httpWarning'));
-            setLoading(false);
             return;
         }
 

@@ -15,7 +15,7 @@
 - **双模式运行**：支持本地模式（直接使用 API Token）和托管模式（服务端中转）
 - **DNS IP 轮换**（托管模式）：
   - 定时自动更换 DNS 记录的 IP 地址（A/AAAA）
-  - 支持 Komari 服务器 IP 池或手动指定 IP 列表
+  - 支持 Komari、NodeGet 服务器 IP 池或手动指定 IP 列表
   - Round-Robin 顺序轮换，使用 cron 表达式精确指定轮换时间点
   - 通过 Cloudflare Workers Cron Triggers + KV 实现
 
@@ -43,6 +43,8 @@ Fork 仓库后，只需在 GitHub Settings → Secrets and variables → Actions
 | `DNSPOD_SECRET_KEY` | 腾讯云 SecretKey |
 | `KOMARI_BASE_URL` | Komari 面板地址 |
 | `KOMARI_API_TOKEN` | Komari API 令牌 |
+| `NODEGET_BASE_URL` | NodeGet 扩展端点地址 |
+| `NODEGET_API_TOKEN` | NodeGet 扩展 API 令牌 |
 
 > **建议**：`CF_API_TOKEN` 同时用于部署和 Worker 运行时。如需分离权限，可创建两个令牌——一个用于 GitHub Actions（Workers + KV 编辑），另一个用于 Worker 运行时（DNS + SSL 编辑），并将运行时令牌设置为 `CF_API_TOKEN` GitHub Secret，部署令牌在 Actions workflow 中单独配置。
 
@@ -85,6 +87,17 @@ npm run deploy
 2. 添加 `KOMARI_API_TOKEN` 变量（Komari API 令牌）
 
 配置后，在 DNS 记录添加/编辑 A 或 AAAA 记录时，可通过下拉框快速选择 Komari 服务器 IP；DNS 列表中已解析的 IP 也会显示对应的 Komari 服务器名称标签。
+
+
+#### NodeGet 集成（可选，托管模式）
+
+如需使用 NodeGet 代理 IP 快捷选择和轮换功能，请额外设置：
+1. 添加 `NODEGET_BASE_URL` 变量（NodeGet 扩展端点地址，如 `https://nodeget-controller.example.com/worker-route/cf-dns-api`）
+2. 添加 `NODEGET_API_TOKEN` 变量（NodeGet 扩展 API 令牌）
+
+> **前置条件**：需先在 NodeGet Dashboard 部署 [extension/worker.js](extension/worker.js) JS Worker。详见 [extension/README.md](extension/README.md)。
+
+配置后，在 DNS 记录添加/编辑 A 或 AAAA 记录时，可通过下拉框快速选择 NodeGet 代理 IP；DNS 列表中已解析的 IP 也会显示对应的 NodeGet 代理名称标签；IP 轮换功能可选择 NodeGet 作为 IP 来源。
 
 
 #### DNS IP 轮换（可选，托管模式）

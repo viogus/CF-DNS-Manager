@@ -3,11 +3,30 @@
 // 暴露 /api/servers 端点，返回 Komari 兼容格式的 agent IP 列表
 
 function isIPv4(ip) {
-    return /^[0-9.]+$/.test(ip) && ip.includes('.');
+    var parts = ip.split('.');
+    if (parts.length !== 4) return false;
+    for (var i = 0; i < 4; i++) {
+        var n = parseInt(parts[i], 10);
+        if (isNaN(n) || n < 0 || n > 255 || String(n) !== parts[i]) return false;
+    }
+    return true;
 }
 
 function isIPv6(ip) {
-    return /:/.test(ip);
+    if (ip === '::') return true;
+    if (!/:/.test(ip)) return false;
+    if (ip.includes(':::')) return false;
+    if (/^:/.test(ip) || /:$/.test(ip)) {
+        if (!/^::/.test(ip) && !/::$/.test(ip)) return false;
+    }
+    var parts = ip.split(':');
+    var nonEmpty = 0;
+    for (var i = 0; i < parts.length; i++) {
+        if (parts[i] === '') continue;
+        nonEmpty++;
+        if (!/^[0-9a-fA-F]{1,4}$/.test(parts[i])) return false;
+    }
+    return nonEmpty > 0 && parts.length >= 1;
 }
 
 function sleep(ms) {
@@ -86,7 +105,7 @@ export default {
                 }
 
                 var nameMap = {};
-                var internalToken = env.super_token || token;
+                var internalToken = env.super_token;
                 var t = token || env.token;
 
                 var ipCmds = [

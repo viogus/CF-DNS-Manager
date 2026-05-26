@@ -27,6 +27,18 @@ const TIMEZONES = [
     'UTC'
 ];
 
+function Modal({ open, onClose, children, zIndex = 1000 }) {
+    if (!open) return null;
+    return (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex }}
+            onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+            <div className="glass-card fade-in" style={{ padding: '2rem', maxWidth: '500px', width: '90%', position: 'relative', maxHeight: '90vh', overflowY: 'auto' }}>
+                {children}
+            </div>
+        </div>
+    );
+}
+
 const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, auth, onBack, t, showToast, tab, setTab }) => {
     const [records, setRecords] = useState([]);
     const [hostnames, setHostnames] = useState([]);
@@ -39,18 +51,6 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
     const { nodegetEnabled, ipToNameMap: nodegetIpToNameMap, getOptions: getNodegetOptions, servers: nodegetServers } = useNodeget(auth);
 
     const sourceLabel = (ipSource) => t('rotationSource' + ipSource.charAt(0).toUpperCase() + ipSource.slice(1));
-
-    const Modal = ({ open, onClose, children, zIndex = 1000 }) => {
-        if (!open) return null;
-        return (
-            <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex }}
-                onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-                <div className="glass-card fade-in" style={{ padding: '2rem', maxWidth: '500px', width: '90%', position: 'relative', maxHeight: '90vh', overflowY: 'auto' }}>
-                    {children}
-                </div>
-            </div>
-        );
-    };
 
     const ServerFilter = ({ servers, filter, filterKey, label }) => (
         <div className="input-row">

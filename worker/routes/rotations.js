@@ -120,13 +120,14 @@ export async function PATCH(request, env, params, data) {
     });
   }
 
-  const existing = await getRotation(env, zoneId, recordId);
-  if (!existing) {
+  const fetched = await getRotation(env, zoneId, recordId);
+  if (!fetched) {
     return new Response(JSON.stringify({ success: false, error: 'Rotation not found' }), {
       status: 404,
       headers: { 'Content-Type': 'application/json' }
     });
   }
+  const existing = { ...fetched };
 
   let body;
   try {
